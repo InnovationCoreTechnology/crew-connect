@@ -44,12 +44,12 @@ Project plan and progress: [DEVELOPMENT_ROADMAP.md](DEVELOPMENT_ROADMAP.md) · B
 ## 4. Coding standards (strict)
 
 - **TypeScript strict-style:** no `any` (use `unknown` + narrowing), no `@ts-ignore`/`eslint-disable` without a written reason, no non-null `!` without a reason. Explicit types at module boundaries.
-- `npm run lint` and `npm run build` (`tsc -b && vite build`) must pass with **zero errors** before anything is called done.
+- From the `web/` directory, `npm run lint` and `npm run build` (`tsc -b && vite build`) must pass with **zero errors** before anything is called done.
 - **Match the surrounding code**: naming, file layout (`features/<role>/…`, `shared/…`, `data/…`), formatting, comment density. Screens call **only** `web/src/data/api.ts`; business rules live in `data/rules.ts` and `app/config.ts` – not inside components.
 - Naming: `PascalCase` components/types, `camelCase` functions/variables, `UPPER_SNAKE` constants, files named after their main export.
 - One responsibility per function/component. Small functions, early returns, no deep nesting. No dead code, no commented-out code.
 - Accessibility: semantic HTML, labels for inputs, keyboard operable, visible focus, contrast per WCAG 2.2 AA.
-- SQL: migrations are plain, numbered, reviewed files in `supabase/migrations/`, **each with a matching down/rollback script**. Constraints (`NOT NULL`, `CHECK`, FK) in the schema, not only in app code. Row Level Security on every table that holds user data.
+- SQL: migrations are plain, numbered, reviewed files in `supabase/migrations/`, **each with a tested reversal script kept beside it**. Supabase applies migrations forward only, so rollback = a new compensating migration; destructive changes need a verified backup first. Constraints (`NOT NULL`, `CHECK`, FK) in the schema, not only in app code. Row Level Security on every table that holds user data.
 - Tests: pure logic (rules, validators, filters, formatters) gets unit tests (Vitest, from Phase 2). Bug fix = add a test that fails first.
 
 **Comments – the "why"**
@@ -74,7 +74,7 @@ Follow `DEVELOPMENT_ROADMAP.md` §3. In short:
 - **Never commit to `main`.** One branch per task (`feat/…`, `fix/…`, `docs/…`, `chore/…`) inside a `phase/N-…` branch. Merge with `--no-ff` so every task reverts with one `git revert -m 1`.
 - Never force-push shared branches, never rewrite published history, never delete branches/tags unless the owner says so.
 - **Push, open PRs and merge only when the owner asks.**
-- Risky behaviour goes behind a feature flag; database changes ship with a rollback script in the same branch.
+- Risky behaviour goes behind a feature flag; database changes ship with a reversal script in the same branch (applied as a new forward migration; it cannot restore deleted data).
 - Destructive actions (dropping tables, deleting data, changing production settings, anything that costs money) need the owner's explicit yes first.
 
 ## 7. Cost discipline
@@ -85,7 +85,7 @@ Follow `DEVELOPMENT_ROADMAP.md` §3. In short:
 
 ## 8. After every task – the summary (mandatory)
 
-1. Tick the roadmap item(s): `[ ]` → `[x]` with date and commit hash.
+1. Tick the roadmap item(s): `[ ]` → `[x]` with the date; add the merge commit hash later in the roadmap change log (a commit cannot contain its own hash).
 2. Append an entry to `docs/IMPLEMENTATION_LOG.md` using the template in that file.
 3. Reply to the owner with the same summary, short: **what changed, why, files touched, how it was verified (commands + result), performance impact, cost impact, how to roll back, what is next / needs the owner**.
 4. Report honestly: failing tests, skipped steps and unverified claims are stated plainly. Do not say "done" unless lint, build and the feature check actually passed.
