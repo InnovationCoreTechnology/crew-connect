@@ -11,7 +11,7 @@ Owner goals: fast · multi-platform · free to start · can move to paid without
 | D1 | Frontend hosting | **Cloudflare**, static assets served from its CDN (Workers Static Assets; Pages is the older product) | Decided |
 | D2 | Backend | **Supabase** (managed PostgreSQL + Auth + Storage + Edge Functions), region **Mumbai `ap-south-1`** | Decided |
 | D3 | SMS OTP provider | **MSG91**, connected through Supabase's *Send SMS hook* | Decided – official MSG91 price **unverified** |
-| D4 | Login method | **Phone + OTP only** (no passwords) | Decided |
+| D4 | Login method | **Mobile + password**; SMS OTP only to register and to reset a forgotten password | **Revised by the owner 2026-10-11** (was: phone + OTP only) |
 
 ## 2. Why each pick
 
@@ -59,10 +59,15 @@ Honest weaknesses and how we handle them:
 - **Price:** not verified from MSG91's official rate card. Third-party sources suggest about ₹0.15–0.25 per OTP before GST – treat as a rough guess only; get the real quote from msg91.com/in/pricing before budgeting.
 - Fast2SMS stays as a fallback; the hook design makes switching a one-function change.
 
-### D4 – Phone + OTP only
-- Our users are guards and housekeepers, often on shared or low-end phones: no password to forget, no reset flow, and **no password storage at all** (the current mock stores plain text).
-- Cost control: Supabase issues long-lived sessions with refresh tokens, so OTP is needed at first login or a new device, not every visit. Limit OTP resends (`resendSeconds`, `maxOtpTries` already in config) and rate-limit per phone/IP.
-- Admin accounts: created manually in the database, protected by an extra check (decide in Phase 1 whether admin uses email + password or OTP + allow-list).
+### D4 – Mobile + password, OTP to register and to reset (revised by the owner, 2026-10-11)
+- **What the user does:** new user = role, mobile number, SMS OTP, then creates a password. Returning user = mobile number + password only (no SMS, so no SMS cost per login). Forgot password = mobile number, SMS OTP, new password.
+- **Why it changed:** the owner wants the familiar password flow with a forgot-password path. My first answer (OTP only, no passwords) was a delegated choice and is replaced. With Supabase Auth the passwords are stored hashed by Supabase, not by our code.
+- **How (official APIs):** `signInWithPassword` for login; `signInWithOtp` + `verifyOtp` to prove the number; `updateUser({ password })` to set the password (the library docs say the user must be signed in first, which a correct OTP does). The reset flow is my combination of those documented calls: UNVERIFIED until tried with real SMS.
+- **Verified on the live project (2026-10-11):** with the Phone provider disabled, even password login by phone answers `phone_provider_disabled` ("Phone logins are disabled"). The provider must be enabled in the dashboard even if no SMS is sent.
+- **Password rules:** minimum 8 characters, with a letter and a number (Supabase: "Anything less than 8 characters is not recommended"). The server minimum is set in the dashboard Auth settings and must be the same or lower. Leaked-password protection is Pro-plan only (not used on Free).
+- **Known risk (Supabase docs):** carriers recycle phone numbers, so a new owner of an old number could reach an old account; the documented mitigation is MFA (not built yet; list it for a later phase).
+- **SMS cost:** now only registration and password resets send SMS; normal logins do not. Supabase rate limits and a CAPTCHA decision are still open (roadmap 1.12).
+- Admin accounts: created manually in the database (`supabase/admin/create_admin.sql`), never from the app.
 
 ## 3. Target architecture
 
@@ -114,6 +119,7 @@ Rules:
 - Database, security rules and tests: see `supabase/README.md`. Phone OTP login is coded but not usable until the Phone provider and an SMS provider are set up (item 1.8).
 - Verified facts from the live project: login for an unknown number answers `otp_disabled`; registration answers `phone_provider_disabled` until Phone sign-in is enabled.
 - Supabase phone OTPs are 6 digits and expire in 60 seconds by default (phone-login guide), so the template's 4-digit demo OTP was removed.
+- 2026-10-11: login rework (D4 revised) and a DEV test-data seed with a password per role; see `supabase/seed/dev_seed.sql`.
 
 ## 8. What happens next
 

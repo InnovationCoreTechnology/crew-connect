@@ -4,24 +4,23 @@ import { useCountdown } from '../../../shared/hooks/useCountdown'
 import { AUTH_CONFIG } from '../config'
 import { authService } from '../services'
 import { AuthError } from '../services/types'
-import type { AuthMode } from '../types'
+import type { OtpPurpose } from '../types'
 import { validateOtp, validatePhone } from '../validators'
 
 type Step = 'phone' | 'otp'
 interface Errors { phone?: string; otp?: string; form?: string }
 
 interface Props {
-  mode: AuthMode
+  purpose: OtpPurpose // 'register' (new account) or 'reset' (forgot password)
   idPrefix: string // keeps input ids unique when two forms exist
-  verifyLabel: string // button text on the OTP step, e.g. "Log in"
-  onVerify: (phone: string, otp: string) => Promise<unknown> // checks the OTP and signs in / registers
-  disabled?: boolean
+  onVerify: (phone: string, otp: string) => Promise<void> // checks the OTP (see AuthContext.verifyOtp)
+  onVerified: (phone: string) => void // the OTP was right: the parent now asks for the password
 }
 
-// The shared "mobile number -> OTP" steps used by both Login and Register (login is OTP-only, no passwords).
+// The shared "mobile number -> OTP" steps used by Register and Forgot password.
 // It sends the SMS, runs the resend timer, counts wrong tries and shows friendly errors.
-// The caller decides what happens after the OTP is right (onVerify). Success moves the user away (see PublicOnly in App.tsx).
-export function PhoneOtpForm({ mode, idPrefix, verifyLabel, onVerify, disabled }: Props) {
+// What happens after the OTP is right is up to the parent (it shows the password step).
+export function PhoneOtpForm({ purpose, idPrefix, onVerify, onVerified }: Props) {
   const countdown = useCountdown(AUTH_CONFIG.resendSeconds)
   const [step, setStep] = useState<Step>('phone')
   const [phone, setPhone] = useState('')
@@ -37,15 +36,18 @@ export function PhoneOtpForm({ mode, idPrefix, verifyLabel, onVerify, disabled }
     setErrors(message ? { phone: message } : {})
   }
 
+  const notRegistered = 'This number is not registered. Tap Register below.'
+  const alreadyRegistered = 'This number is already registered. Tap Log in below.'
+
   async function submitPhone() {
     const message = validatePhone(phone)
     if (message) { setErrors({ phone: message }); return }
     setBusy(true)
     try {
-      await authService.sendOtp(phone, mode)
+      await authService.sendOtp(phone, purpose)
       setErrors({}); setOtp(''); setTries(0); setStep('otp'); countdown.start()
     } catch (err) {
-      if (err instanceof AuthError && err.code === 'NOT_REGISTERED') setErrors({ phone: 'This number is not registered. Tap Register below.' })
+      if (err instanceof AuthError && err.code === 'NOT_REGISTERED') setErrors({ phone: notRegistered })
       else setErrors({ form: err instanceof AuthError ? err.message : 'Something went wrong. Please try again.' })
     } finally {
       setBusy(false)
@@ -58,10 +60,12 @@ export function PhoneOtpForm({ mode, idPrefix, verifyLabel, onVerify, disabled }
     setBusy(true)
     try {
       await onVerify(phone, otp)
-      // Success: the page moves on by itself.
+      countdown.stop()
+      onVerified(phone)
     } catch (err) {
       if (!(err instanceof AuthError)) { setErrors({ form: 'Something went wrong. Please try again.' }); return }
-      if (err.code === 'NOT_REGISTERED') { backToPhone('This number is not registered. Tap Register below.'); return }
+      if (err.code === 'NOT_REGISTERED') { backToPhone(notRegistered); return }
+      if (err.code === 'ALREADY_REGISTERED') { backToPhone(alreadyRegistered); return }
       if (err.code === 'INVALID_OTP') {
         const used = tries + 1
         setTries(used)
@@ -79,7 +83,7 @@ export function PhoneOtpForm({ mode, idPrefix, verifyLabel, onVerify, disabled }
   async function resend() {
     setBusy(true)
     try {
-      await authService.sendOtp(phone, mode)
+      await authService.sendOtp(phone, purpose)
       setTries(0); setErrors({}); countdown.start()
     } catch (err) {
       setErrors({ form: err instanceof AuthError ? err.message : 'Something went wrong. Please try again.' })
@@ -116,8 +120,8 @@ export function PhoneOtpForm({ mode, idPrefix, verifyLabel, onVerify, disabled }
       )}
 
       {errors.form && <p className="ferr" role="alert">{errors.form}</p>}
-      <button type="button" className="btn big full" disabled={busy || disabled} onClick={submit}>
-        {busy ? 'Please wait…' : step === 'phone' ? 'Send OTP' : verifyLabel}
+      <button type="button" className="btn big full" disabled={busy} onClick={submit}>
+        {busy ? 'Please wait…' : step === 'phone' ? 'Send OTP' : 'Verify OTP'}
       </button>
     </>
   )

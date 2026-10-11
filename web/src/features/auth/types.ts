@@ -8,4 +8,7 @@ export interface User {
   role: Role
 }
 
-export type AuthMode = 'login' | 'register'
+// Which screen is shown. `forgot` = reset a forgotten password.
+export type AuthMode = 'login' | 'register' | 'forgot'
+// Why an OTP is requested: to create an account, or to prove ownership of the number when resetting a password.
+export type OtpPurpose = 'register' | 'reset'
