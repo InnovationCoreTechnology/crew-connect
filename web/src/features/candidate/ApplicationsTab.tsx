@@ -6,8 +6,8 @@ import { useResource } from '../../shared/hooks/useResource'
 
 const TONE: Record<ApplicationStatus, 'ok' | 'warn' | 'bad'> = { Applied: 'warn', Shortlisted: 'ok', Rejected: 'bad' }
 
-export function ApplicationsTab({ candidateId }: { candidateId: string }) {
-  const loader = useCallback(() => listApplications(candidateId), [candidateId])
+export function ApplicationsTab() {
+  const loader = useCallback(() => listApplications(), [])
   const apps = useResource(loader)
 
   return (

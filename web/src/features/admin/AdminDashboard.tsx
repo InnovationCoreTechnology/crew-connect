@@ -9,7 +9,7 @@ import { useAuth } from '../auth/context/useAuth'
 import { CandidatesTable } from './CandidatesTable'
 import { EmployersTable } from './EmployersTable'
 
-// Admin screen. Admins cannot register: they are created by you (see mockAuthService / Supabase).
+// Admin screen. Admins cannot register: the owner creates them with supabase/admin/create_admin.sql.
 // TODO (Jobs): add a tab to review and remove fake or spam jobs.
 // TODO (Reports): users, jobs, applications and revenue over time (charts).
 // TODO (ID check): open the candidate's uploaded ID photo before pressing Verify.

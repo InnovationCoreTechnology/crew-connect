@@ -16,7 +16,7 @@ export function CandidateDashboard() {
   const { user, logout } = useAuth()
   const userId = user?.id ?? ''
   const phone = user?.phone ?? ''
-  const loader = useCallback(() => getCandidateProfile(userId, phone), [userId, phone])
+  const loader = useCallback(() => getCandidateProfile(userId), [userId])
   const profileRes = useResource(loader)
   const [tab, setTab] = useState('profile')
   const profile = profileRes.data
@@ -38,7 +38,7 @@ export function CandidateDashboard() {
           />
           {tab === 'profile' && <ProfileForm key={profile.id} profile={profile} onSaved={profileRes.reload} />}
           {tab === 'jobs' && <JobsTab profile={profile} onGoToProfile={() => setTab('profile')} />}
-          {tab === 'apps' && <ApplicationsTab candidateId={profile.id} />}
+          {tab === 'apps' && <ApplicationsTab />}
         </>
       )}
     </DashboardShell>
