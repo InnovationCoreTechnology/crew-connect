@@ -63,3 +63,17 @@ Append-only history of what was built, why, and how to undo it. Newest entry at 
   2. **1.11**: put the secret key in `web/.env.seed.local` yourself (never in chat) with `SEED_CONFIRM=crew-connect-dev`, then run `npm run seed:dev` from `web/`.
   3. **1.12**: read the real rate limits in Authentication -> Rate Limits and decide on CAPTCHA (Cloudflare Turnstile).
   4. Merge PRs #1 and #2 first, then open the Phase 1 PR (`phase/1-backend-auth` is stacked on them).
+
+### 2026-10-11 · D4 revised + 1.7 rework + 1.10/1.11 · Mobile + password login, OTP to register/reset, test data for all roles
+- Branch / commit: `phase/1b-password-login` (3118b4f auth, 4cebd61 seed). Stacked on main after PR #3.
+- What changed: (1) Owner decision D4 revised: log in with mobile + password; SMS OTP only to register and to reset a forgotten password. Rewrote the auth flow (`AuthService`, `supabaseAuthService`, `AuthProvider`, Login/Register/ForgotPassword/NewPassword forms, restored `PasswordField`, password rules min 8). (2) `supabase/seed/dev_seed.sql` applied to the DEV project: 26 logins with passwords, data for every role. The earlier key-based seed script was removed.
+- Why: the owner wants the familiar password flow, a forgot-password path and test accounts for every role to check the forms.
+- Sources (official, checked 2026-10-11): Supabase password-based auth (phone sections), password security, phone login; supabase-js `updateUser` / `signInWithPassword` documentation in the installed package.
+- Verification: `npm run lint`, `npm run build` zero errors (first-load JS 143.0 KB gzip, budget 150 KB). Browser against the live Mumbai project: login, forgot and register screens render; a reset OTP request for a seeded number shows the friendly "Phone login is not available right now" message. Live API check with a throwaway user (deleted afterwards): password login answers `phone_provider_disabled` while the Phone provider is off. Seed counts checked by SQL (26 logins, 21 candidates, 4 employers, 5 jobs, 1 application, 1 admin).
+- NOT verified: any successful login, registration, reset, or the three dashboards with data. All blocked on enabling the Phone provider (login) and an SMS provider (register/reset). The hand-inserted seed users are also unproven against Supabase Auth until a login works.
+- Performance impact: +1.6 KB gzip first-load JS (141.4 -> 143.0 KB).
+- Cost impact: none now. SMS is used only for register and reset; MSG91 price still unverified.
+- Dependencies changed: none.
+- Rollback: `git revert -m 1 754e523` (auth) and `git revert 4cebd61` (seed files); remove seeded users as described in `supabase/seed/dev_seed.sql`.
+- Secrets: the three generated test passwords live only in the git-ignored `web/.seed-credentials.local` and in this session's tool calls; none is in the repo (checked with a repo-wide search).
+- Follow-ups / needs owner: enable the Phone provider in the Supabase dashboard (then I verify logins for every role and test each screen in the browser); SMS provider (MSG91 + DLT) for register/reset; decide on MFA for recycled numbers; match the server's minimum password length (8) in Authentication settings.
