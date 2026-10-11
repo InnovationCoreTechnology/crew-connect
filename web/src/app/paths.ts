@@ -5,7 +5,7 @@ export const PATHS = {
   login: '/login',
   candidate: '/candidate',
   employer: '/employer',
-  // TODO (Admin): add `admin: '/admin'` here when you build the admin panel.
+  admin: '/admin',
 } as const
 
 export const homePathFor = (role: Role): string => PATHS[role]

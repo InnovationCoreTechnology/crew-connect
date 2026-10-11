@@ -6,7 +6,7 @@ import { AUTH_CONFIG } from '../config'
 import { useAuth } from '../context/useAuth'
 import { authService } from '../services'
 import { AuthError } from '../services/types'
-import type { Role } from '../types'
+import type { SignupRole } from '../types'
 import { validateConfirm, validateNewPassword, validateOtp, validatePhone } from '../validators'
 import { RoleToggle } from './RoleToggle'
 
@@ -16,8 +16,8 @@ const BUTTON_LABEL: Record<Step, string> = { phone: 'Send OTP', otp: 'Verify OTP
 const ALREADY = 'This number is already registered. Tap Log in below.'
 
 interface Props {
-  role: Role
-  onRoleChange: (role: Role) => void
+  role: SignupRole
+  onRoleChange: (role: SignupRole) => void
   onSwitchToLogin: () => void
 }
 

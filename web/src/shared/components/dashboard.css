@@ -3,4 +3,69 @@
 .who{display:flex;align-items:center;gap:10px}
 .wrap{max-width:1100px;margin:0 auto;padding:16px}
 .page-title{font-size:22px;margin-bottom:14px}
-.todo{margin:10px 0 0;padding-left:18px;display:grid;gap:6px}
+.tabs{display:flex;gap:6px;overflow-x:auto;margin:4px 0 14px}
+.tabs button,.chips button{border:1px solid var(--line);background:var(--card);color:var(--text);border-radius:8px;padding:8px 14px;font:inherit;font-weight:600;cursor:pointer;white-space:nowrap}
+.tabs button.on,.chips button.on{background:var(--pri);color:var(--pri-text);border-color:var(--pri)}
+.chips{display:flex;gap:6px;flex-wrap:wrap}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin:0 0 14px}
+.stat{display:flex;flex-direction:column;gap:2px;padding:12px 14px}
+.stat b{font-size:24px;line-height:1.2}
+.stat .note{font-size:12px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:12px}
+.filters{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:0 10px;align-items:end;margin-top:6px}
+.check{display:flex;gap:8px;align-items:center;color:var(--text);font-size:14px;margin:0 0 10px;cursor:pointer}
+.check input{width:18px;height:18px;padding:0}
+.row{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:6px}
+.meta{display:grid;gap:3px;font-size:13px;margin:8px 0 12px}
+.mask{margin:0 0 8px}
+.item{display:flex;flex-direction:column}
+.item>.tag{align-self:flex-start}
+.item .meta{margin-bottom:12px}
+.push{margin-top:auto}
+.stale{opacity:.55;transition:opacity .15s}
+.bar{margin-bottom:12px}
+.bar .field{margin-top:0}
+.count{margin:12px 0 8px}
+.card>h2,.card>.row>h2{font-size:18px;margin-bottom:8px}
+.card>.row:has(h2){margin-bottom:4px}
+.card>.chips{margin:4px 0 8px}
+.tag{background:var(--card);border:1px solid var(--line);color:var(--text);border-radius:99px;padding:2px 9px;font-size:12px;font-weight:600;white-space:nowrap}
+.tag.ok{background:var(--okbg);color:var(--ok);border-color:transparent}
+.tag.warn{background:#fff0c2;color:#8a5a00;border-color:transparent}
+.tag.bad{background:var(--badbg);color:var(--bad);border-color:transparent}
+@media (prefers-color-scheme:dark){.tag.warn{background:#3d2d07;color:#fec84b}}
+.banner{border-radius:10px;padding:12px 14px;margin:0 0 14px;font-size:14px;border:1px solid var(--line);background:var(--card)}
+.banner.warn{background:#fff0c2;color:#6b4500;border-color:transparent}
+.banner.bad{background:var(--badbg);color:var(--bad);border-color:transparent}
+@media (prefers-color-scheme:dark){.banner.warn{background:#3d2d07;color:#fec84b}}
+.empty{text-align:center;padding:30px 10px;color:var(--muted);grid-column:1/-1}
+.scroll{overflow-x:auto}
+table{width:100%;border-collapse:collapse}
+th,td{text-align:left;padding:9px;border-bottom:1px solid var(--line);font-size:14px;white-space:nowrap}
+th{color:var(--muted);font-weight:600;font-size:12px}
+.actions{display:flex;gap:6px}
+.form{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:0 14px}
+.saved{color:var(--ok);font-size:14px;margin:10px 0 0}
+
+/* Phones: tables turn into stacked cards so the Status and Action columns are never hidden off-screen. */
+@media (max-width:640px){
+  .top{padding:10px 12px}
+  .brand{font-size:16px}
+  .who .muted{font-size:12px}
+  .wrap{padding:12px}
+  .page-title{font-size:20px;margin-bottom:10px}
+  .stats{grid-template-columns:repeat(2,1fr);gap:8px}
+  .stat{padding:10px 12px}
+  .stat b{font-size:20px}
+  .chips{flex-wrap:nowrap;overflow-x:auto;padding-bottom:2px}
+  .rtable thead{display:none}
+  .rtable,.rtable tbody,.rtable tr,.rtable td{display:block;width:100%}
+  .rtable tr{border:1px solid var(--line);border-radius:10px;padding:6px 12px;margin:0 0 10px;background:var(--bg)}
+  .rtable td{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:7px 0;white-space:normal;text-align:right}
+  .rtable td:last-child{border-bottom:0}
+  .rtable td::before{content:attr(data-label);color:var(--muted);font-size:12px;font-weight:600;text-align:left}
+  .rtable td[data-label="Action"]{justify-content:flex-end}
+  .rtable td[data-label="Action"]::before{display:none}
+  .rtable .actions .btn{padding:8px 14px}
+}
+@media (max-width:360px){.who .muted{display:none}}

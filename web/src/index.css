@@ -16,12 +16,12 @@ h1,h2{margin:0;line-height:1.2}
 .btn.full{width:100%}
 .btn.big{padding:13px;font-size:16px;margin-top:16px}
 .linkb{background:none;border:0;color:var(--pri);font:inherit;font-size:14px;font-weight:700;text-decoration:underline;cursor:pointer;padding:0}
-button:focus-visible,input:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+button:focus-visible,input:focus-visible,select:focus-visible,a:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
 
 /* Form fields */
 .field{margin-top:12px}
 label{font-size:12px;color:var(--muted);display:block;margin-bottom:3px}
-input{width:100%;padding:12px;font-size:16px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--text);font-family:inherit}
+input{width:100%;height:48px;padding:0 12px;font-size:16px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--text);font-family:inherit}
 input.bad{border-color:var(--bad)}
 .ferr{color:var(--bad);font-size:12.5px;margin:4px 0 0}
 .pwf{position:relative}
@@ -33,3 +33,9 @@ input.bad{border-color:var(--bad)}
 .seg{display:flex;gap:6px;margin:14px 0 6px}
 .seg button{flex:1;padding:12px 6px;border:2px solid var(--line);background:var(--card);color:var(--text);border-radius:8px;font:inherit;font-weight:600;cursor:pointer}
 .seg button.on{background:var(--pri);color:var(--pri-text);border-color:var(--pri)}
+
+select{width:100%;height:48px;padding:0 12px;font-size:16px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--text);font-family:inherit}
+select.bad{border-color:var(--bad)}
+a.btn{display:inline-block;text-decoration:none}
+.btn.ok{background:var(--okbg);color:var(--ok)}
+.btn.bad{background:var(--badbg);color:var(--bad)}

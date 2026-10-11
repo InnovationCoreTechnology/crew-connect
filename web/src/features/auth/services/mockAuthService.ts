@@ -17,6 +17,8 @@ interface StoredUser extends User {
 const SEED_USERS: StoredUser[] = [
   { id: 'u1', phone: '9845000001', role: 'candidate', password: 'demo123' },
   { id: 'u2', phone: '9845000002', role: 'employer', password: 'demo123' },
+  // Admin is created by you, never by self-registration. TODO: in Supabase, set role 'admin' manually.
+  { id: 'admin1', phone: '9845000000', role: 'admin', password: 'demo123' },
 ]
 
 const wait = (ms = 400) => new Promise((resolve) => setTimeout(resolve, ms)) // pretend the network is slow
@@ -25,7 +27,9 @@ const toUser = (u: StoredUser): User => ({ id: u.id, phone: u.phone, role: u.rol
 function readUsers(): StoredUser[] {
   try {
     const raw = localStorage.getItem(USERS_KEY)
-    return raw ? (JSON.parse(raw) as StoredUser[]) : SEED_USERS
+    const saved = raw ? (JSON.parse(raw) as StoredUser[]) : []
+    // Always keep the test accounts available, even if older data was saved.
+    return [...SEED_USERS.filter((s) => !saved.some((u) => u.phone === s.phone)), ...saved]
   } catch {
     return SEED_USERS
   }

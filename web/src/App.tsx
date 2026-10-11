@@ -4,6 +4,7 @@ import { RequireRole } from './app/RequireRole'
 import { PATHS } from './app/paths'
 import { AuthPage } from './features/auth/AuthPage'
 import { AuthProvider } from './features/auth/context/AuthProvider'
+import { AdminDashboard } from './features/admin/AdminDashboard'
 import { CandidateDashboard } from './features/candidate/CandidateDashboard'
 import { EmployerDashboard } from './features/employer/EmployerDashboard'
 
@@ -18,8 +19,7 @@ export default function App() {
           <Route path={PATHS.login} element={<PublicOnly><AuthPage /></PublicOnly>} />
           <Route path={PATHS.candidate} element={<RequireRole role="candidate"><CandidateDashboard /></RequireRole>} />
           <Route path={PATHS.employer} element={<RequireRole role="employer"><EmployerDashboard /></RequireRole>} />
-          {/* TODO (Admin): add an admin Route here. Admin should NOT be self-registered:
-              create admin users manually in Supabase and give them role 'admin'. */}
+          <Route path={PATHS.admin} element={<RequireRole role="admin"><AdminDashboard /></RequireRole>} />
           <Route path="*" element={<Navigate to={PATHS.login} replace />} />
         </Routes>
       </AuthProvider>

@@ -1,35 +1,52 @@
+import { useCallback, useState } from 'react'
+import { PRICING } from '../../app/config'
+import { getEmployerAccount } from '../../data/api'
+import { unlockBlockReason } from '../../data/rules'
 import { DashboardShell } from '../../shared/components/DashboardShell'
+import { StatsRow } from '../../shared/components/StatsRow'
+import { Tabs } from '../../shared/components/Tabs'
+import { formatInr } from '../../shared/format'
+import { useResource } from '../../shared/hooks/useResource'
 import { useAuth } from '../auth/context/useAuth'
+import { FindCandidatesTab } from './FindCandidatesTab'
+import { UnlockedTab } from './UnlockedTab'
 
-// PLACEHOLDER page. Build each TODO below as its own small component inside this folder
-// (for example CandidateFilters.tsx, CandidateCard.tsx, UnlockedList.tsx).
-//
-// TODO 1 (Candidate search): list candidates from Supabase with these filters:
-//   job type (Security / Housekeeping), minimum experience, area, maximum salary, shift,
-//   verified only, search by name. Put the filter state in a hook (useCandidateFilters.ts)
-//   and the filtering itself in the database query, not in the browser (30,000 candidates is too many).
-// TODO 2 (Candidate card): show name, type, experience, area, salary, shift, availability.
-//   Show the phone number MASKED (98XXXXX123) until unlocked.
-// TODO 3 (Unlock contact): button calls a Supabase database function that, in ONE step:
-//   checks the employer is approved, uses a free unlock if left (PRICING.freeUnlocksForNewEmployer),
-//   otherwise charges PRICING.pricePerUnlockInr, saves the row in `unlocks`, and returns the phone number.
-//   NEVER send the full phone number to the browser before this succeeds.
-// TODO 4 (Wallet / payments): buy unlock packs with Razorpay. Add refund-as-credit for wrong numbers.
-// TODO 5 (Post jobs): form to create / edit / close jobs, and a list of applicants per job.
-// TODO 6 (Company verification): collect company name and GST/CIN. Admin approves before unlocking is allowed.
+// Employer screen = stat cards + tabs. Each tab is its own file.
+// TODO (Post jobs): form to create / edit / close jobs, and a list of applicants per job (new tab + new file).
+// TODO (Payments): buy unlock packs with Razorpay (for example ₹300 for 10 unlocks).
+// TODO (Company verification): collect company name and GST/CIN; admin approves before unlocking is allowed.
 export function EmployerDashboard() {
   const { user, logout } = useAuth()
+  const userId = user?.id ?? ''
+  const phone = user?.phone ?? ''
+  const loader = useCallback(() => getEmployerAccount(userId, phone), [userId, phone])
+  const accountRes = useResource(loader)
+  const [tab, setTab] = useState('find')
+  const account = accountRes.data
+  const blockReason = account ? unlockBlockReason(account) : ''
+
   return (
-    <DashboardShell title="Employer dashboard" subtitle={`+91 ${user?.phone ?? ''}`} onLogout={logout}>
-      <div className="card">
-        <h2>Welcome</h2>
-        <p className="muted">This page is a placeholder. Open this file and follow the TODO list at the top.</p>
-        <ul className="todo">
-          <li>Find candidates (with filters)</li>
-          <li>Unlocked contacts</li>
-          <li>Post a job</li>
-        </ul>
-      </div>
+    <DashboardShell title={account?.companyName || 'Employer dashboard'} subtitle={`+91 ${phone}`} onLogout={logout}>
+      {!accountRes.data && accountRes.loading && <p className="center-note">Loading…</p>}
+      {accountRes.error && <p className="ferr" role="alert">{accountRes.error}</p>}
+      {account && (
+        <>
+          {blockReason && <div className={`banner ${account.status === 'Blocked' ? 'bad' : 'warn'}`}>{blockReason}</div>}
+          <StatsRow items={[
+            { label: 'Free unlocks left', value: account.freeUnlocksLeft },
+            { label: 'Candidates unlocked', value: account.unlockedCount },
+            { label: 'Spent', value: formatInr(account.spentInr) },
+            { label: 'Price per unlock', value: formatInr(PRICING.pricePerUnlockInr), note: 'after free unlocks' },
+          ]} />
+          <Tabs
+            items={[{ key: 'find', label: 'Find candidates' }, { key: 'unlocked', label: `Unlocked (${account.unlockedCount})` }]}
+            active={tab}
+            onChange={setTab}
+          />
+          {tab === 'find' && <FindCandidatesTab account={account} canUnlock={!blockReason} onAccountChange={accountRes.setData} />}
+          {tab === 'unlocked' && <UnlockedTab employerId={account.id} />}
+        </>
+      )}
     </DashboardShell>
   )
 }

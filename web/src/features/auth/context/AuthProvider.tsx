@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { authService } from '../services'
-import type { Role, User } from '../types'
+import type { SignupRole, User } from '../types'
 import { AuthContext, type AuthContextValue } from './AuthContext'
 
 // Keeps "who is logged in" for the whole app. Wrap the app with it once (see App.tsx).
@@ -18,7 +18,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return loggedIn
   }, [])
 
-  const register = useCallback(async (input: { phone: string; password: string; role: Role }) => {
+  const register = useCallback(async (input: { phone: string; password: string; role: SignupRole }) => {
     const created = await authService.register(input)
     setUser(created)
     return created

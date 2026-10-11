@@ -1,11 +1,11 @@
-import type { Role } from '../types'
+import type { SignupRole } from '../types'
 
-const OPTIONS: { value: Role; label: string }[] = [
+const OPTIONS: { value: SignupRole; label: string }[] = [
   { value: 'candidate', label: 'I want a job' },
   { value: 'employer', label: 'I want to hire' },
 ]
 
-export function RoleToggle({ value, onChange }: { value: Role; onChange: (role: Role) => void }) {
+export function RoleToggle({ value, onChange }: { value: SignupRole; onChange: (role: SignupRole) => void }) {
   return (
     <div className="seg" role="group" aria-label="What do you want to do?">
       {OPTIONS.map((o) => (

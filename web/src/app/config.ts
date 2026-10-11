@@ -16,3 +16,12 @@ export const PRICING = {
   freeUnlocksForNewEmployer: 3,
   pricePerUnlockInr: 30,
 } as const
+
+// TODO: When you add more cities, load AREAS from the database per city instead of this list.
+export const AREAS = [
+  'Whitefield', 'Koramangala', 'HSR Layout', 'Indiranagar',
+  'Marathahalli', 'Electronic City', 'Jayanagar', 'Yelahanka',
+] as const
+
+export const SHIFTS = ['Day', 'Night', 'Any'] as const
+export const AVAILABILITY = ['Immediate', '15 days', '30 days'] as const
