@@ -4,8 +4,9 @@ import type { SignupRole, User } from '../types'
 export interface AuthContextValue {
   user: User | null
   loading: boolean // true while we check if the user is already logged in
-  login: (phone: string, password: string) => Promise<User>
-  register: (input: { phone: string; password: string; role: SignupRole }) => Promise<User>
+  // Both end a successful OTP check with the user logged in. Errors are thrown as AuthError (see services/types.ts).
+  signIn: (phone: string, otp: string) => Promise<User>
+  signUp: (phone: string, otp: string, role: SignupRole) => Promise<User>
   logout: () => Promise<void>
 }
 

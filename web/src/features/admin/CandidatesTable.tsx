@@ -27,7 +27,7 @@ export function CandidatesTable({ onChanged }: { onChanged: () => void }) {
     }
   }
 
-  const rows = (result.data ?? []).filter((c) => type === 'All' || c.type === type)
+  const rows = (result.data?.items ?? []).filter((c) => type === 'All' || c.type === type)
 
   return (
     <div className="card scroll">
@@ -74,6 +74,7 @@ export function CandidatesTable({ onChanged }: { onChanged: () => void }) {
         </table>
       )}
       {result.data && rows.length === 0 && <div className="empty">No candidates for this job type.</div>}
+      {result.data?.truncated && <p className="muted">Showing the newest 500 candidates only.</p>}
     </div>
   )
 }
