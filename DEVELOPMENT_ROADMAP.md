@@ -105,9 +105,9 @@ main                       ← always working/deployable; protected; only receiv
 
 | Need | Choice (proposed – owner confirms in Open decisions) | Free tier / cost | Why this one | Reference |
 |---|---|---|---|---|
-| Frontend hosting | Cloudflare Pages (or Vercel/Netlify) | Free, global CDN, unlimited bandwidth on CF | Fast static hosting, instant rollbacks, preview URL per branch | https://developers.cloudflare.com/pages/ |
-| Database + Auth + Storage + API | Supabase | Free plan (small DB, file storage, monthly active users cap). **Free projects pause after about a week of inactivity** and have no automatic backups | Postgres + Row Level Security + auth in one; fits our `api.ts` seam | https://supabase.com/docs , https://supabase.com/pricing |
-| SMS OTP | MSG91 or Fast2SMS | **Not free** – pay per SMS (low, paise-level) and needs **DLT registration** (mandatory in India, takes days) | Phone OTP is how this audience logs in. Cheapest realistic option | https://msg91.com , https://www.fast2sms.com |
+| Frontend hosting | Cloudflare (Workers Static Assets; Pages is the older product) – **decided D1** | Static asset requests free and unlimited per Cloudflare docs (checked 2026-10-11) | Fast static hosting, instant rollbacks, preview URL per branch | https://developers.cloudflare.com/pages/ |
+| Database + Auth + Storage + API | Supabase – **decided D2** | Free plan (small DB, file storage, monthly active users cap). **Free projects pause after about a week of inactivity** and have no automatic backups | Postgres + Row Level Security + auth in one; fits our `api.ts` seam | https://supabase.com/docs , https://supabase.com/pricing |
+| SMS OTP | MSG91 – **decided D3** (Fast2SMS fallback) | **Not free** – pay per SMS (low, paise-level) and needs **DLT registration** (mandatory in India, takes days) | Phone OTP is how this audience logs in. Cheapest realistic option | https://msg91.com , https://www.fast2sms.com |
 | Payments | Razorpay | No monthly fee; per-transaction fee (~2%) taken only when money moves | Standard in India, supports UPI | https://razorpay.com/docs |
 | Error tracking | Sentry | Free developer plan | See production errors, not guess | https://docs.sentry.io |
 | Analytics | Plausible (paid) or PostHog / Cloudflare Web Analytics | CF Web Analytics free; PostHog has a free tier | Know what users do, privacy friendly | https://posthog.com/pricing |
@@ -143,10 +143,10 @@ main                       ← always working/deployable; protected; only receiv
 
 ## 7. Open decisions (owner must answer – Claude must NOT assume)
 
-- [ ] D1. Hosting: Cloudflare Pages vs Vercel vs Netlify?
-- [ ] D2. Backend: Supabase confirmed? (alternatives: Firebase, self-hosted)
-- [ ] D3. SMS provider: MSG91 vs Fast2SMS? (DLT registration entity name needed)
-- [ ] D4. Login method: phone + OTP only, or phone + password + OTP (current mock does both)?
+- [x] D1. Hosting: **Cloudflare** (static assets on its CDN). Decided by Claude on owner's delegation, 2026-10-11. Vercel Hobby rejected (non-commercial only). Reasons + sources: `docs/BACKEND_PLAN.md`
+- [x] D2. Backend: **Supabase** (Postgres + Auth + Storage + Edge Functions), Mumbai region. Same delegation/date. Free to start, Pro (~$25/mo) when triggers in `docs/BACKEND_PLAN.md` §2 are hit
+- [x] D3. SMS provider: **MSG91** via Supabase Send SMS hook (Fast2SMS = fallback). Official MSG91 price still **unverified**; DLT registration entity name still needed from owner
+- [x] D4. Login method: **phone + OTP only** (no passwords). Same delegation/date
 - [ ] D5. Pricing: keep ₹30/unlock + 3 free? Wallet top-up minimum? Refund policy for wrong numbers?
 - [ ] D6. Legal entity / GST for invoices; privacy policy & terms owner?
 - [ ] D7. Launch city/areas order (Bangalore: which 2–3 areas first)?
@@ -164,10 +164,12 @@ Legend: `[ ]` not started · `[x]` done (add date + commit) · every phase ends 
 ### Phase 0 – Planning & foundations  *(branch: `docs/development-roadmap`)*
 Why: agree the plan before spending effort.
 - [x] 0.1 Review existing template and write this roadmap (2026-10-11)
-- [ ] 0.2 Owner answers Open decisions D1–D11 (at least D1–D4 before Phase 1)
+- [ ] 0.2 Owner answers remaining Open decisions D5–D11 (D1–D4 done)
 - [ ] 0.3 Fix README (remove false Tailwind claim, add run/build instructions and link to this file)
 - [ ] 0.4 Add `.env.example` (names of variables only, no secrets) and confirm `.env*` is git-ignored
 - [ ] 0.5 Set up branch protection on `main` on GitHub (owner action; Claude gives steps)
+- [x] 0.6 Add `CLAUDE.md` (standing rules), `docs/BACKEND_PLAN.md`, `docs/IMPLEMENTATION_LOG.md`; decide D1–D4 (2026-10-11, branch `docs/instructions-backend-plan`)
+- [ ] 0.7 Dependency check: `npm outdated` shows TypeScript 6.0.3 → 7.0.2 and @types/node 24 → 26 (majors). Upgrade on `chore/deps-*` branches only after reading the official migration guides (owner decides when)
 **Exit check:** owner has approved the plan and picked the next phase.
 
 ### Phase 1 – Real backend: database, auth, security  *(branch: `phase/1-backend-auth`)*
@@ -188,7 +190,7 @@ Why: today nothing is real. Money rules and personal data cannot live in the bro
 
 ### Phase 2 – Deploy + CI + monitoring (free)  *(branch: `phase/2-deploy-ci`)*
 Why: deploy early and often so every later phase is tested in real conditions, and rollback exists from day one.
-- [ ] 2.1 Connect repo to hosting (D1); every branch gets a preview URL; `main` = production
+- [ ] 2.1 Connect repo to Cloudflare (D1) and verify SPA fallback routing + rollback procedure in its official docs; every branch gets a preview URL; `main` = production
 - [ ] 2.2 Environment variables set in hosting (staging vs production Supabase projects if owner approves; otherwise one project and a clear note of the risk)
 - [ ] 2.3 GitHub Actions: install → `tsc` → `eslint` → build on every PR
 - [ ] 2.4 Add Vitest + first tests for pure logic (`rules.ts`, `filters.ts`, validators, `maskPhone`)
@@ -274,8 +276,9 @@ Why: product is only proven by real usage.
 
 ---
 
-## 9. Change log (Claude appends one line per finished task)
+## 9. Change log (one line per finished task; full detail in `docs/IMPLEMENTATION_LOG.md`)
 
 | Date | Task | Branch | Commit | Rollback |
 |---|---|---|---|---|
-| 2026-10-11 | 0.1 Roadmap created | `docs/development-roadmap` | see git log | delete file / revert commit |
+| 2026-10-11 | 0.1 Roadmap created | `docs/development-roadmap` | f68dc6e | delete file / revert commit |
+| 2026-10-11 | 0.6 Instructions, backend plan, D1–D4 | `docs/instructions-backend-plan` | see git log | revert commit |
