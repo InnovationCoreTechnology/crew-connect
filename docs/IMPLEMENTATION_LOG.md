@@ -77,3 +77,13 @@ Append-only history of what was built, why, and how to undo it. Newest entry at 
 - Rollback: `git revert -m 1 754e523` (auth) and `git revert 4cebd61` (seed files); remove seeded users as described in `supabase/seed/dev_seed.sql`.
 - Secrets: the three generated test passwords live only in the git-ignored `web/.seed-credentials.local` and in this session's tool calls; none is in the repo (checked with a repo-wide search).
 - Follow-ups / needs owner: enable the Phone provider in the Supabase dashboard (then I verify logins for every role and test each screen in the browser); SMS provider (MSG91 + DLT) for register/reset; decide on MFA for recycled numbers; match the server's minimum password length (8) in Authentication settings.
+### 2026-10-11 · 2.1 (part) · First hosted version on Cloudflare
+- Branch / commit: `phase/2-deploy-ci` (task `feat/cloudflare-hosting` 61a97e8, PR #4).
+- What changed: `web/wrangler.jsonc` (assets-only, SPA fallback), `.node-version` 22, `wrangler` dev dependency. Deployed manually with `npx wrangler deploy` from the owner's terminal. Account workers.dev subdomain: `innovationcore`.
+- Live URL: https://crew-connect.innovationcore.workers.dev
+- Sources (official, checked 2026-10-11): Cloudflare Workers static assets, Workers Builds configuration + build image, workers.dev subdomain docs.
+- Verification: local `wrangler dev` and the live site: `/`, `/login`, `/employer`, `/candidate`, `/admin` and an unknown path all return 200 with the app; the login page renders in a browser; the deployed bundle contains the dev Supabase URL and publishable (public) key. The new subdomain's HTTPS took about 30-60 s to start working.
+- Cost impact: none (Workers free plan; static asset requests are free per Cloudflare docs).
+- Rollback: Cloudflare dashboard -> Workers & Pages -> crew-connect -> Deployments (rollback procedure NOT yet tested; roadmap 2.9), or redeploy an older commit.
+- Caveats: this is a DEV site pointing at the DEV database. The site is public. Phone login still cannot work until item 1.8 (SMS provider). Wrangler login for the deploy gave Wrangler broad Cloudflare scopes; revoke in the Cloudflare dashboard (My Profile -> API Tokens / authorized apps, UNVERIFIED path) if the machine is shared.
+- Follow-ups: connect GitHub for auto-deploy and preview URLs; production vs dev Supabase projects; custom domain (2.8).
