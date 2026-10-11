@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react'
+import { useState } from 'react'
 import { PRICING } from '../../app/config'
 import { getEmployerAccount } from '../../data/api'
 import { unlockBlockReason } from '../../data/rules'
@@ -17,10 +17,8 @@ import { UnlockedTab } from './UnlockedTab'
 // TODO (Company verification): collect company name and GST/CIN; admin approves before unlocking is allowed.
 export function EmployerDashboard() {
   const { user, logout } = useAuth()
-  const userId = user?.id ?? ''
   const phone = user?.phone ?? ''
-  const loader = useCallback(() => getEmployerAccount(userId, phone), [userId, phone])
-  const accountRes = useResource(loader)
+  const accountRes = useResource(getEmployerAccount)
   const [tab, setTab] = useState('find')
   const account = accountRes.data
   const blockReason = account ? unlockBlockReason(account) : ''
@@ -44,7 +42,7 @@ export function EmployerDashboard() {
             onChange={setTab}
           />
           {tab === 'find' && <FindCandidatesTab account={account} canUnlock={!blockReason} onAccountChange={accountRes.setData} />}
-          {tab === 'unlocked' && <UnlockedTab employerId={account.id} />}
+          {tab === 'unlocked' && <UnlockedTab />}
         </>
       )}
     </DashboardShell>

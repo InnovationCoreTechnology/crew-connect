@@ -108,7 +108,14 @@ Rules:
 | Self-hosted Postgres/VPS | Rejected for now: needs operations work (patching, backups, uptime) the project does not want at this stage. |
 | Netlify | Not evaluated; no advantage over Cloudflare identified. |
 
-## 7. What happens next
+## 7. Phase 1 status (2026-10-11)
+- Project `crew-connect` created in **ap-south-1 (Mumbai)**, ref `qehkkituvqaishysoqta`, cost $0. The first project was in Sydney; Supabase's official guide ("Change Project Region") confirms a region cannot be changed in place, so it was recreated while still empty.
+- The only project is treated as **DEV**. Create a second Free project for production before launch (Free plan allows 2 active projects, verified above).
+- Database, security rules and tests: see `supabase/README.md`. Phone OTP login is coded but not usable until the Phone provider and an SMS provider are set up (item 1.8).
+- Verified facts from the live project: login for an unknown number answers `otp_disabled`; registration answers `phone_provider_disabled` until Phone sign-in is enabled.
+- Supabase phone OTPs are 6 digits and expire in 60 seconds by default (phone-login guide), so the template's 4-digit demo OTP was removed.
+
+## 8. What happens next
 
 1. Owner creates accounts: GitHub (exists), Cloudflare, Supabase (**choose region Mumbai**), and starts MSG91 + DLT registration.
 2. Phase 1 starts only when the owner says so.

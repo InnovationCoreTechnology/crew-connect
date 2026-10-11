@@ -37,7 +37,7 @@ export function EmployersTable({ onChanged }: { onChanged: () => void }) {
         <table className="rtable">
           <thead><tr><th>Company</th><th>Mobile</th><th>Status</th><th>Free unlocks</th><th>Spent</th><th>Action</th></tr></thead>
           <tbody>
-            {result.data.map((e) => (
+            {result.data.items.map((e) => (
               <tr key={e.id}>
                 <td data-label="Company">{e.companyName || 'Company name not added yet'}</td>
                 <td data-label="Mobile">{e.phone}</td>
@@ -61,6 +61,7 @@ export function EmployersTable({ onChanged }: { onChanged: () => void }) {
           </tbody>
         </table>
       )}
+      {result.data?.truncated && <p className="muted">Showing the newest 500 employers only.</p>}
     </div>
   )
 }

@@ -49,7 +49,7 @@ Project plan and progress: [DEVELOPMENT_ROADMAP.md](DEVELOPMENT_ROADMAP.md) · B
 - Naming: `PascalCase` components/types, `camelCase` functions/variables, `UPPER_SNAKE` constants, files named after their main export.
 - One responsibility per function/component. Small functions, early returns, no deep nesting. No dead code, no commented-out code.
 - Accessibility: semantic HTML, labels for inputs, keyboard operable, visible focus, contrast per WCAG 2.2 AA.
-- SQL: migrations are plain, numbered, reviewed files in `supabase/migrations/`, **each with a tested reversal script kept beside it**. Supabase applies migrations forward only, so rollback = a new compensating migration; destructive changes need a verified backup first. Constraints (`NOT NULL`, `CHECK`, FK) in the schema, not only in app code. Row Level Security on every table that holds user data.
+- SQL: migrations are plain, numbered, reviewed files in `supabase/migrations/`, **each with a tested reversal script in `supabase/rollback/` (same timestamp)**. Supabase applies migrations forward only, so rollback = a new compensating migration; destructive changes need a verified backup first. Constraints (`NOT NULL`, `CHECK`, FK) in the schema, not only in app code. Row Level Security on every table that holds user data.
 - Tests: pure logic (rules, validators, filters, formatters) gets unit tests (Vitest, from Phase 2). Bug fix = add a test that fails first.
 
 **Comments – the "why"**

@@ -15,7 +15,7 @@ export function JobsTab({ profile, onGoToProfile }: { profile: CandidateProfile;
   const [busyId, setBusyId] = useState('')
   const [error, setError] = useState('')
   const jobsLoader = useCallback(() => listJobs(type), [type])
-  const appsLoader = useCallback(() => listApplications(profile.id), [profile.id])
+  const appsLoader = useCallback(() => listApplications(), [])
   const jobs = useResource(jobsLoader)
   const apps = useResource(appsLoader)
 
@@ -26,7 +26,7 @@ export function JobsTab({ profile, onGoToProfile }: { profile: CandidateProfile;
     setError('')
     setBusyId(jobId)
     try {
-      await applyToJob(profile.id, jobId)
+      await applyToJob(jobId)
       apps.reload()
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Could not apply. Please try again.')
