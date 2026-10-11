@@ -1,0 +1,30 @@
+import { useState } from 'react'
+import { AuthLayout } from './components/AuthLayout'
+import { LoginForm } from './components/LoginForm'
+import { RegisterForm } from './components/RegisterForm'
+import { getAuthCopy } from './copy'
+import type { AuthMode, Role } from './types'
+
+// The login page. It only decides: show LoginForm or RegisterForm, and which role is chosen.
+export function AuthPage() {
+  const [mode, setMode] = useState<AuthMode>('login')
+  const [role, setRole] = useState<Role>('candidate')
+  const [resetKey, setResetKey] = useState(0)
+  const copy = getAuthCopy(mode, role)
+
+  // Changing the key makes React rebuild the form, so all fields go back to their default state.
+  function changeRole(next: Role) {
+    setRole(next)
+    setResetKey((k) => k + 1)
+  }
+
+  return (
+    <AuthLayout title={copy.title} points={copy.points}>
+      {mode === 'login' ? (
+        <LoginForm onSwitchToRegister={() => setMode('register')} />
+      ) : (
+        <RegisterForm key={resetKey} role={role} onRoleChange={changeRole} onSwitchToLogin={() => setMode('login')} />
+      )}
+    </AuthLayout>
+  )
+}
