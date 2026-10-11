@@ -11,13 +11,13 @@ Last updated: 2026-10-11 · Current status: **Phase 0 – Planning (template/pro
 
 1. **Do only the phase the owner names.** Never start the next phase on your own. Never assume a decision – if something is listed under "Open decisions" or is unclear, ask.
 2. **Work in a new branch for every task** (see section 3). Never commit directly to `main`.
-3. **Tick the checklist.** When a task is finished and verified, change `[ ]` to `[x]` in this file *in the same commit*, and add the date + commit hash. Before starting any work, read the checklist and skip what is already ticked (no repeated work).
+3. **Tick the checklist.** When a task is finished and verified, change `[ ]` to `[x]` in this file *in the same commit* and add the date. A commit cannot contain its own hash, so the **merge commit hash** is added afterwards in a small follow-up docs commit (in the change log, section 9). Before starting any work, read the checklist and skip what is already ticked (no repeated work).
 4. **Comment the "why".** Every new file/function that is not obvious gets a short comment: *why it exists, what it does, where it is used, and a reference link* if it relies on an external service. Keep comments factual, not noisy.
 5. **Tell the owner what changed.** After each task: list files changed, what changed, and how to roll it back (branch/tag name).
 6. **Cost rule:** start on free tiers. Anything that costs money must be listed in the "Cost tracker" (section 6) and approved by the owner before it is added.
 7. **Speed rule:** the product must feel fast on a cheap Android phone on 4G. Budgets are in section 5 and are checked at the end of every phase.
 8. **Security rule:** no secrets in the repo (use `.env.local`, which is git-ignored). Never store Aadhaar numbers. Business rules that earn money (unlock, pricing, wallet) live on the **server**, never only in the browser.
-9. **Verify before saying "done":** `npm run build` and `npm run lint` must pass, and the feature must be tried in the browser.
+9. **Verify before saying "done":** run `npm run build` and `npm run lint` **from the `web/` directory** (the scripts exist only in `web/package.json`); both must pass, and the feature must be tried in the browser.
 
 ---
 
@@ -90,13 +90,13 @@ main                       ← always working/deployable; protected; only receiv
 | Undo a whole phase already in `main` | `git revert -m 1 <phase-merge-commit>` (new commit, safe, history kept) |
 | Go back to a known good state to inspect | `git checkout phase-N-done` (tag) |
 | Production broken right now | Redeploy previous deployment from hosting dashboard (instant, no git needed) – see Phase 2 |
-| Bad database change | Run the matching **down migration** (every migration ships with one, see Phase 1) |
+| Bad database change | Ship a **new forward "compensating" migration** that reverses the change (Supabase applies migrations forward; it does not run paired `down` files automatically). Reversing a destructive change (drop column/table, delete rows) **cannot restore data**, so before applying one: take a backup (`pg_dump`, Phase 2.10), apply on a test/branch database first, and rehearse the restore. See Phase 1.3 |
 
 **Rules**
 - Never `git push --force` on `main`. Never rewrite published history.
 - Never delete a phase branch or tag until the owner says so.
-- Database and code changes of a task live in the **same branch**, so they are reverted together.
-- Risky features go behind a **feature flag** (`web/src/app/config.ts` → `FEATURES`) so they can be switched off without a deploy rollback.
+- Database and code changes of a task live in the **same branch**, but reverting the code does **not** undo an already-applied database migration. Roll back the database separately with a compensating migration or a backup restore (see the rollback table). Prefer additive, backward-compatible migrations (add columns/tables first, remove old ones in a later release) so old code keeps working.
+- Risky features go behind a **feature flag**. A flag in `web/src/app/config.ts` is compiled into the bundle, so changing it needs a new build and deploy (still quick, but not instant). For an **instant kill switch without redeploying**, store the flag server-side (a Supabase `feature_flags` table read at app start) – decided per feature in the phase that needs it.
 - Claude pushes/merges only when the owner says so.
 
 ---
@@ -159,7 +159,7 @@ main                       ← always working/deployable; protected; only receiv
 
 ## 8. PHASES – Progress checklist
 
-Legend: `[ ]` not started · `[x]` done (add date + commit) · every phase ends with its **Exit check** and tag `phase-N-done`.
+Legend: `[ ]` not started · `[x]` done (add date; merge hash goes in the change log afterwards) · every phase ends with its **Exit check** and tag `phase-N-done`.
 
 ### Phase 0 – Planning & foundations  *(branch: `docs/development-roadmap`)*
 Why: agree the plan before spending effort.
@@ -176,7 +176,7 @@ Why: agree the plan before spending effort.
 Why: today nothing is real. Money rules and personal data cannot live in the browser.
 - [ ] 1.1 Create Supabase project (owner creates account; Claude gives steps), store keys in `.env.local`
 - [ ] 1.2 Add `web/src/lib/supabase.ts` client (comment: why one shared client)
-- [ ] 1.3 Create `supabase/migrations/` – SQL tables: `profiles`(role), `candidates`, `employers`, `jobs`, `applications`, `unlocks`, `wallet_ledger`. **Each migration has an `up` and a `down` file** (rollback)
+- [ ] 1.3 Create `supabase/migrations/` – SQL tables: `profiles`(role), `candidates`, `employers`, `jobs`, `applications`, `unlocks`, `wallet_ledger`. **Rollback = forward compensating migration** (a new file that reverses the change; Supabase does not auto-run `down` files). Keep a reversal script next to each migration, test it on a throwaway database, and require a verified backup before any destructive migration (drop/delete)
 - [ ] 1.4 Indexes on filtered columns (type, area, shift, salary, verified)
 - [ ] 1.5 **Row Level Security** policies: candidates edit only own row; employers see candidates **without phone**; admins full access; phone only returned via the unlock function
 - [ ] 1.6 SQL function `unlock_candidate()` – one atomic transaction: check employer approved → check not already unlocked → use free unlock or deduct balance → record unlock → return phone. Comment each rule (this is the revenue protection)
