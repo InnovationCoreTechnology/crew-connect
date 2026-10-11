@@ -4,7 +4,7 @@ import type { AuthMode, SignupRole } from './types'
 // The words shown on the left side of the login page. Edit text here, not in the component.
 export function getAuthCopy(mode: AuthMode, role: SignupRole): { title: string; points: string[] } {
   const free = PRICING.freeUnlocksForNewEmployer
-  if (mode === 'login') {
+  if (mode !== 'register') {
     return {
       title: 'Security and housekeeping jobs',
       points: ['Free for job seekers', 'Verified candidates for employers', `New employers get ${free} free candidate contacts`],

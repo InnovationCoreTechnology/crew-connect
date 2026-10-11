@@ -8,5 +8,8 @@ export const AUTH_CONFIG = {
   // Tries are counted here only to keep the screen friendly. The real limits (SMS per number, per hour, OTP expiry)
   // are enforced by Supabase Auth: dashboard -> Authentication -> Rate Limits.
   maxOtpTries: 3,
+  // Supabase's own guidance: "Anything less than 8 characters is not recommended" (https://supabase.com/docs/guides/auth/password-security).
+  // The project's server-side minimum (dashboard -> Authentication) must be the same or lower, or Supabase answers `weak_password`.
+  minPasswordLength: 8,
   resendSeconds: 60, // Supabase allows one OTP per phone per ~60 seconds by default
 } as const
