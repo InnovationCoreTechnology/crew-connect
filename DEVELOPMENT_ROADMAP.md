@@ -190,7 +190,7 @@ Why: today nothing is real. Money rules and personal data cannot live in the bro
 
 ### Phase 2 – Deploy + CI + monitoring (free)  *(branch: `phase/2-deploy-ci`)*
 Why: deploy early and often so every later phase is tested in real conditions, and rollback exists from day one.
-- [ ] 2.1 Connect repo to Cloudflare (D1) and verify SPA fallback routing + rollback procedure in its official docs; every branch gets a preview URL; `main` = production
+- [ ] 2.1 (PARTLY DONE 2026-10-11: site is live at https://crew-connect.innovationcore.workers.dev via a manual `npx wrangler deploy`; SPA fallback verified. STILL TO DO: connect GitHub for auto-deploys + branch preview URLs, and document/test the rollback) Connect repo to Cloudflare (D1) and verify SPA fallback routing + rollback procedure in its official docs; every branch gets a preview URL; `main` = production
 - [ ] 2.2 Environment variables set in hosting (staging vs production Supabase projects if owner approves; otherwise one project and a clear note of the risk)
 - [ ] 2.3 GitHub Actions: install → `tsc` → `eslint` → build on every PR
 - [ ] 2.4 Add Vitest + first tests for pure logic (`rules.ts`, `filters.ts`, validators, `maskPhone`)
