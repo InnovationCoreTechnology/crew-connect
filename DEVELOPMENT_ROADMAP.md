@@ -135,7 +135,7 @@ main                       ← always working/deployable; protected; only receiv
 | Item | Type | Monthly / one-time | Added in phase | Approved by owner |
 |---|---|---|---|---|
 | Domain | one-time/yearly | TBD | 2 | [ ] |
-| SMS OTP + DLT registration | per SMS | TBD | 1 | [ ] |
+| SMS OTP + DLT registration | per SMS (third-party estimates ₹0.15–0.25 per OTP before GST; MSG91's own rate card still UNVERIFIED) | TBD | 1 | [ ] |
 | Razorpay | % per transaction | only on revenue | 3 | [ ] |
 | Supabase Pro (only if free limits hit / need backups) | monthly | TBD | when needed | [ ] |
 
@@ -174,18 +174,18 @@ Why: agree the plan before spending effort.
 
 ### Phase 1 – Real backend: database, auth, security  *(branch: `phase/1-backend-auth`)*
 Why: today nothing is real. Money rules and personal data cannot live in the browser.
-- [ ] 1.1 Create Supabase project (owner creates account; Claude gives steps), store keys in `.env.local`
-- [ ] 1.2 Add `web/src/lib/supabase.ts` client (comment: why one shared client)
-- [ ] 1.3 Create `supabase/migrations/` – SQL tables: `profiles`(role), `candidates`, `employers`, `jobs`, `applications`, `unlocks`, `wallet_ledger`. **Rollback = forward compensating migration** (a new file that reverses the change; Supabase does not auto-run `down` files). Keep a reversal script next to each migration, test it on a throwaway database, and require a verified backup before any destructive migration (drop/delete)
-- [ ] 1.4 Indexes on filtered columns (type, area, shift, salary, verified)
-- [ ] 1.5 **Row Level Security** policies: candidates edit only own row; employers see candidates **without phone**; admins full access; phone only returned via the unlock function
-- [ ] 1.6 SQL function `unlock_candidate()` – one atomic transaction: check employer approved → check not already unlocked → use free unlock or deduct balance → record unlock → return phone. Comment each rule (this is the revenue protection)
-- [ ] 1.7 Replace `mockAuthService` with `supabaseAuthService` (same interface) and switch in `features/auth/services/index.ts`. Remove plain-text passwords and `demoOtp`
-- [ ] 1.8 Phone OTP via SMS provider (needs D3 + DLT; until ready, use Supabase test OTP numbers in dev only)
-- [ ] 1.9 Rewrite `data/api.ts` bodies to call Supabase, **keeping function names and return types**; delete `mockDb.ts`
-- [ ] 1.10 Admin user created manually in DB (never via sign-up)
-- [ ] 1.11 Seed script for dev data (separate from production)
-- [ ] 1.12 Protect against abuse: OTP rate limit, max tries (config already has `maxOtpTries`)
+- [x] 1.1 Create Supabase project (owner creates account; Claude gives steps), store keys in `.env.local` — done 2026-10-11 (project `crew-connect`, Mumbai; the first Sydney project was deleted)
+- [x] 1.2 Add `web/src/lib/supabase.ts` client (comment: why one shared client) — 2026-10-11, typed with generated `database.types.ts`
+- [x] 1.3 Create `supabase/migrations/` – SQL tables: `profiles`(role), `candidates`, `employers`, `jobs`, `applications`, `unlocks`, `wallet_ledger`. **Rollback = forward compensating migration** (a new file that reverses the change; Supabase does not auto-run `down` files). Keep a reversal script next to each migration, test it on a throwaway database, and require a verified backup before any destructive migration (drop/delete) — done 2026-10-11; reversal scripts in `supabase/rollback/` tested in a rolled-back transaction
+- [x] 1.4 Indexes on filtered columns (type, area, shift, salary, verified) — 2026-10-11; EXPLAIN ANALYZE at 100k rows: first page 0.05 ms, page 50,000 deep 0.05 ms, multi-filter 0.25 ms, name search (trigram) 10 ms
+- [x] 1.5 **Row Level Security** policies: candidates edit only own row; employers see candidates **without phone**; admins full access; phone only returned via the unlock function — done 2026-10-11 (employers use `search_candidates()`; proved by `supabase/tests/rules.test.sql`)
+- [x] 1.6 SQL function `unlock_candidate()` – one atomic transaction: check employer approved → check not already unlocked → use free unlock or deduct balance → record unlock → return phone. Comment each rule (this is the revenue protection) — done 2026-10-11. NOTE: a paid unlock is only recorded in the ledger until Phase 3 collects money
+- [x] 1.7 Replace `mockAuthService` with `supabaseAuthService` (same interface) and switch in `features/auth/services/index.ts`. Remove plain-text passwords and `demoOtp` — done 2026-10-11 (login is OTP-only, D4). The full happy-path login is NOT yet tried in a browser: it needs 1.8
+- [ ] 1.8 Phone OTP via SMS provider (needs D3 + DLT; until ready, use Supabase test OTP numbers in dev only) — **BLOCKED on owner**: the live project answers `phone_provider_disabled` ("Unsupported phone provider") until Phone sign-in is enabled and an SMS provider is connected (MSG91 via the Send SMS hook). Hosted "test OTP numbers" are not in the official docs I could read: UNVERIFIED, check Authentication -> Sign In / Providers -> Phone in the dashboard
+- [x] 1.9 Rewrite `data/api.ts` bodies to call Supabase, **keeping function names and return types**; delete `mockDb.ts` — done 2026-10-11. Names kept; params that became server-side (user id/phone) were dropped; lists now return pages (`Page<T>`) and admin lists `AdminList<T>` (see log)
+- [ ] 1.10 Admin user created manually in DB (never via sign-up) — script `supabase/admin/create_admin.sql` written and tested (rolled back); **no admin exists yet**: needs the first real OTP login (1.8)
+- [ ] 1.11 Seed script for dev data (separate from production) — `web/scripts/seed-dev.mjs` written, dry-run tested; **not run against the database** (needs the secret key in `web/.env.seed.local`, owner action). The only project is treated as DEV
+- [ ] 1.12 Protect against abuse: OTP rate limit, max tries (config already has `maxOtpTries`) — Supabase enforces per-user OTP spacing, a project-wide hourly OTP cap and per-IP verification limits (https://supabase.com/docs/guides/auth/rate-limits); the default NUMBERS are not rendered in the docs: UNVERIFIED, read them in Authentication -> Rate Limits. Owner decision needed: enable CAPTCHA (Cloudflare Turnstile, free) before launch, because the project-wide OTP cap can be used to lock real users out and SMS costs money
 **Exit check:** two different browsers/accounts cannot see each other's private data; cannot get a phone number without unlock; unlock cannot be repeated for free; build + lint pass.
 
 ### Phase 2 – Deploy + CI + monitoring (free)  *(branch: `phase/2-deploy-ci`)*
@@ -196,7 +196,7 @@ Why: deploy early and often so every later phase is tested in real conditions, a
 - [ ] 2.4 Add Vitest + first tests for pure logic (`rules.ts`, `filters.ts`, validators, `maskPhone`)
 - [ ] 2.5 Sentry error tracking (free plan)
 - [ ] 2.6 Basic analytics (privacy-friendly, free)
-- [ ] 2.7 Lazy-load role dashboards (`React.lazy`) to meet the bundle budget; record bundle size in this file
+- [x] 2.7 Lazy-load role dashboards (`React.lazy`) to meet the bundle budget; record bundle size in this file — done early (2026-10-11) because Phase 1's `@supabase/supabase-js` pushed the bundle to 147 KB gzip. Now **141.4 KB gzip** first load (budget 150 KB; the Supabase client is about 49 KB of it). Perf pass (Phase 7) can try the smaller `auth-js` + `postgrest-js` packages (UNVERIFIED that Supabase supports that)
 - [ ] 2.8 Custom domain + HTTPS (domain cost → Cost tracker)
 - [ ] 2.9 Write "How to roll back production" in this file after testing it once for real
 - [ ] 2.10 Supabase free-tier keep-alive + manual backup routine (free projects pause and lack backups) – export SQL weekly until paid plan
@@ -219,7 +219,7 @@ Why: today employers cannot post jobs, so the candidate side has nothing to appl
 - [ ] 4.2 Employer company profile: company name, address, GST (collected at first login – currently blank)
 - [ ] 4.3 Applicant pipeline per job: Applied → Shortlisted → Interview → Hired / Rejected
 - [ ] 4.4 Candidate sees status changes in "My applications"
-- [ ] 4.5 Pagination + server-side filtering for candidates and jobs
+- [ ] 4.5 Pagination + server-side filtering for candidates and jobs — candidates and unlocked lists are DONE in Phase 1 (keyset paging + Load more); jobs (capped at 100) and admin lists (capped at 500) remain
 - [ ] 4.6 Make job types/areas data-driven (tables) instead of hard-coded lists in `config.ts`
 - [ ] 4.7 Job expiry and "filled" state
 **Exit check:** full loop works with real accounts: post job → candidate applies → employer shortlists → candidate sees it.
@@ -281,4 +281,7 @@ Why: product is only proven by real usage.
 | Date | Task | Branch | Commit | Rollback |
 |---|---|---|---|---|
 | 2026-10-11 | 0.1 Roadmap created | `docs/development-roadmap` | f68dc6e | delete file / revert commit |
-| 2026-10-11 | 0.6 Instructions, backend plan, D1–D4 | `docs/instructions-backend-plan` | see git log | revert commit |
+| 2026-10-11 | 0.6 Instructions, backend plan, D1–D4 | `docs/instructions-backend-plan` | 429ce3f | revert commit |
+| 2026-10-11 | 1.3–1.6 Database schema, RLS, functions, tests | `feat/db-schema` | 233a539 (merge 9f57887) | `git revert -m 1 9f57887` + apply `supabase/rollback/*` in reverse order |
+| 2026-10-11 | 1.2, 1.7, 1.9, 2.7 Supabase client, OTP login, data layer | `feat/frontend-supabase` | 912722b (merge f268f03) | `git revert -m 1 f268f03` |
+| 2026-10-11 | 1.11 Dev seed script (not run) | `feat/dev-seed` | 175ecbb (merge 4442a37) | `git revert -m 1 4442a37` |
