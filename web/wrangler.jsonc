@@ -1,0 +1,14 @@
+{
+  // Cloudflare hosting for the web app (roadmap 2.1, decision D1).
+  // WHAT: serves the built files in ./dist from Cloudflare's CDN. There is no server code (no "main" script).
+  // WHY not_found_handling: the app uses client-side routes (/employer, /candidate, /admin). Without this, refreshing
+  //   one of those URLs would show a 404; with it, unknown paths get index.html and React Router takes over.
+  // Docs: https://developers.cloudflare.com/workers/static-assets/
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "crew-connect",
+  "compatibility_date": "2026-10-11",
+  "assets": {
+    "directory": "./dist",
+    "not_found_handling": "single-page-application"
+  }
+}
