@@ -10,6 +10,7 @@ Project: **crew-connect**, region **ap-south-1 (Mumbai)**, ref `qehkkituvqaishys
 | `rollback/` | One reversal script per migration, **same timestamp**. | Applied as a NEW forward migration if a step must be undone. Tested 2026-10-11 (see log). |
 | `tests/` | `rules.test.sql`: proves the security and money rules. | Run after every migration. |
 | `admin/` | `create_admin.sql`: how an admin is made (never from the app). | By hand, once per admin. |
+| `seed/` | `dev_seed.sql`: fake test accounts and data (DEV only). | By hand, when you want test data. |
 
 ## Rules for every change (from CLAUDE.md)
 1. New migration file `YYYYMMDDHHMMSS_name.sql` + its `rollback/…down.sql`. Never edit a migration that was already applied.
@@ -33,5 +34,7 @@ they are the API, and each one checks the caller's role itself (proved by `tests
   `unlocks`, but a true parallel test is not automated yet (the SQL test runs in one session).
 
 ## Dev data
-`npm run seed:dev -- --dry-run` (from `web/`) shows the plan. A real run needs the **secret key** in `web/.env.seed.local`
-(git-ignored) plus `SEED_CONFIRM=crew-connect-dev`. See the header of `web/scripts/seed-dev.mjs`.
+`seed/dev_seed.sql` creates fake logins WITH passwords (candidate, employer, admin and 23 other people, 5 jobs) so every screen can
+be tried without SMS. Replace the three password placeholders with your own passwords first, keep them in a git-ignored file
+(for example `web/.seed-credentials.local`), and run it only on the DEV project. It is safe to run again. The earlier key-based
+script `web/scripts/seed-dev.mjs` was removed because it created logins without passwords.
