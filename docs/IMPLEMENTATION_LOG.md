@@ -204,3 +204,11 @@ Append-only history of what was built, why, and how to undo it. Newest entry at 
 - Verification: `npm run lint` clean; `npm run build` clean (first load 144.18 KB gzip; candidate chunk 3.69 KB gzip); `timeAgo` checked with a small script (today, yesterday, 5 days, 2 weeks, 8 weeks, dated, invalid input gives an empty string).
 - NOT verified: the screen in a browser (login goes to the remote Supabase project; the Cloudflare preview of this PR can be used). Interview and Hired steps are always "not reached": no employer pipeline exists yet (roadmap 4.3), so the screen cannot show them honestly any other way. The shortlisted line says "may contact you", which is true only if the employer unlocks the number. No unit tests: Vitest arrives with roadmap 2.4.
 - Cost impact: none. Rollback: `git revert -m 1 <merge>`.
+
+### 2026-10-12 · Design: admin dashboard v2 (roadmap 4.8, 4.9)
+- Branch: `docs/admin-dashboard-plan` (from `develop`). Documentation only, nothing built.
+- Why: the owner asked for an admin dashboard with visitors, companies, candidates, revenue, SMS / token cost, master forms for categories, approvals and add / modify users.
+- What: `docs/ADMIN_DASHBOARD.md` (what exists, which data does not exist yet and what unlocks it, five screens, data and performance design, the careful design for add / modify users, build order, risks, cost), roadmap items 4.8 and 4.9, open decisions D18-D25.
+- Sources: repo only, plus Cloudflare Web Analytics overview page (https://developers.cloudflare.com/web-analytics/, checked 2026-10-12: describes itself as privacy-first; the page did not state price, cookie use, setup or an API, so those are marked UNVERIFIED). MSG91's public login page showed no price or API information, so SMS cost is planned as an owner-supplied rate, marked UNVERIFIED.
+- NOT verified: all of it is a plan; no tile, function or table exists yet.
+- Cost impact: none now. Rollback: `git revert -m 1 <merge>`.

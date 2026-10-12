@@ -160,6 +160,14 @@ main                  <- production; only tested, owner-approved releases; every
 - [ ] D15. Bangalore only, or build the city table now? (recommended: city table now, only Bangalore shown)
 - [ ] D16. Can users suggest a missing designation, or admin-only? (recommended: admin-only first)
 - [ ] D17. Keep Shift and Availability fixed in code (recommended) or admin lists?
+- [ ] D18. Visitors: unique visitors, page views, or both? Is a link to Cloudflare's own analytics acceptable if our dashboard cannot read it? (recommended: link first)
+- [ ] D19. Show "Revenue (demo credits)" before real payments, or hide revenue and net until Phase 3? (recommended: show, clearly labelled)
+- [ ] D20. Admin MFA before real users, and how many admins / who? (recommended: yes)
+- [ ] D21. Admin may create candidates and employers, or employers only? Activate when the person sets a password by OTP? (recommended: both, activate by OTP)
+- [ ] D22. May the admin change a user's phone number or role? (recommended: no in v1)
+- [ ] D23. What must an employer submit before approval (company name only today; GST, address, ID?) and must a rejection give a reason?
+- [ ] D24. Cost per SMS (from your MSG91 rate card) and which other costs count (recommended: SMS and payment fees automatic, fixed costs entered by hand)
+- [ ] D25. IST and Indian digit grouping for all dashboard numbers (recommended: yes)
 
 ---
 
@@ -233,6 +241,8 @@ Why: today employers cannot post jobs, so the candidate side has nothing to appl
 - [ ] 4.5 Pagination + server-side filtering for candidates and jobs — candidates and unlocked lists are DONE in Phase 1 (keyset paging + Load more); jobs (capped at 100) and admin lists (capped at 500) remain
 - [ ] 4.6 Admin-controlled lists (job categories + designations, cities + areas, business numbers, reasons) instead of hard-coded lists in `config.ts` and CHECK constraints. DESIGN written 2026-10-12: [docs/ADMIN_CONTROLLED_LISTS.md](docs/ADMIN_CONTROLLED_LISTS.md); build order there (DB -> admin Lists tab -> candidate/job/search screens -> areas -> numbers/reasons -> cleanup). **Blocked on D12-D17**
 - [ ] 4.7 Job expiry and "filled" state
+- [ ] 4.8 Admin dashboard v2 (design: [docs/ADMIN_DASHBOARD.md](docs/ADMIN_DASHBOARD.md), written 2026-10-12): Overview tiles with date range, Approvals queue, Users (add / edit / block with audit log), Master data (= 4.6), Money tab. Build order is in the doc; the visitors tile waits for 2.6, the SMS cost tile for 1.8 plus an SMS counter, revenue and net for Phase 3. **Blocked on D12-D25**
+- [ ] 4.9 Audit table for admin actions (shared with 4.6 and 5.6)
 **Exit check:** full loop works with real accounts: post job → candidate applies → employer shortlists → candidate sees it.
 
 ### Phase 5 – Trust & verification  *(branch: `phase/5-trust-verification`)*
@@ -306,3 +316,4 @@ Why: product is only proven by real usage.
 | 2026-10-12 | Release v0.1.0 (first release: develop -> main via PR #9; tag on `4464f5f`; the release template was NOT used for this first one) | `develop` into `main` | 4464f5f | Cloudflare: redeploy previous deployment; git: `git revert -m 1 4464f5f` on a `hotfix/*` branch |
 | 2026-10-12 | Design for admin-controlled lists (4.6), decisions D12-D17 opened | `docs/admin-controlled-lists` into `develop` | see git log | `git revert -m 1 <merge>` |
 | 2026-10-12 | Improved My applications screen (4.4 part) | `feat/applications-view` into `develop` | see git log | `git revert -m 1 <merge>` |
+| 2026-10-12 | Design for admin dashboard v2 (4.8), decisions D18-D25 opened | `docs/admin-dashboard-plan` into `develop` | see git log | `git revert -m 1 <merge>` |
