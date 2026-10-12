@@ -204,3 +204,18 @@ Append-only history of what was built, why, and how to undo it. Newest entry at 
 - Verification: `npm run lint` clean; `npm run build` clean (first load 144.18 KB gzip; candidate chunk 3.69 KB gzip); `timeAgo` checked with a small script (today, yesterday, 5 days, 2 weeks, 8 weeks, dated, invalid input gives an empty string).
 - NOT verified: the screen in a browser (login goes to the remote Supabase project; the Cloudflare preview of this PR can be used). Interview and Hired steps are always "not reached": no employer pipeline exists yet (roadmap 4.3), so the screen cannot show them honestly any other way. The shortlisted line says "may contact you", which is true only if the employer unlocks the number. No unit tests: Vitest arrives with roadmap 2.4.
 - Cost impact: none. Rollback: `git revert -m 1 <merge>`.
+
+### 2026-10-12 · Design: admin dashboard v2 (roadmap 4.8, 4.9)
+- Branch: `docs/admin-dashboard-plan` (from `develop`). Documentation only, nothing built.
+- Why: the owner asked for an admin dashboard with visitors, companies, candidates, revenue, SMS / token cost, master forms for categories, approvals and add / modify users.
+- What: `docs/ADMIN_DASHBOARD.md` (what exists, which data does not exist yet and what unlocks it, five screens, data and performance design, the careful design for add / modify users, build order, risks, cost), roadmap items 4.8 and 4.9, open decisions D18-D25.
+- Sources: repo only, plus Cloudflare Web Analytics overview page (https://developers.cloudflare.com/web-analytics/, checked 2026-10-12: describes itself as privacy-first; the page did not state price, cookie use, setup or an API, so those are marked UNVERIFIED). MSG91's public login page showed no price or API information, so SMS cost is planned as an owner-supplied rate, marked UNVERIFIED.
+- NOT verified: all of it is a plan; no tile, function or table exists yet.
+- Cost impact: none now. Rollback: `git revert -m 1 <merge>`.
+
+### 2026-10-12 · Admin dashboard design revised (owner decision D21)
+- Branch: `docs/admin-dashboard-plan` (same PR).
+- Owner decision: the admin does not create candidates or employers; the admin can add another admin and can hard delete users and employers.
+- Changed in `docs/ADMIN_DASHBOARD.md` section 5, decisions and risks; roadmap D21 ticked with the answer, D26 (hard delete rules) and D27 (who may add / delete admins) opened.
+- Finding from the schema (checked in `supabase/migrations/20261011130000_core_schema.sql`): deleting a candidate works (applications and unlocks cascade, ledger rows keep the amount and lose the candidate link); deleting an employer is BLOCKED while it has wallet ledger rows (`on delete restrict`, deliberate so money records cannot vanish). The design needs the owner's choice in D26.
+- NOT verified: Supabase Auth admin delete behaviour in our Edge Function is a plan, not tested. Docs only, nothing built.
