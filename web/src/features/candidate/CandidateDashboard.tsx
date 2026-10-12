@@ -7,7 +7,7 @@ import { useResource } from '../../shared/hooks/useResource'
 import { useAuth } from '../auth/context/useAuth'
 import { ApplicationsTab } from './ApplicationsTab'
 import { JobsTab } from './JobsTab'
-import { ProfileForm } from './ProfileForm'
+import { ProfileTab } from './ProfileTab'
 
 // Candidate screen = tabs. Each tab is its own file, so adding or removing one is easy.
 // TODO (Job alerts): push notification when a matching job is posted (Firebase Cloud Messaging).
@@ -36,7 +36,7 @@ export function CandidateDashboard() {
             active={tab}
             onChange={setTab}
           />
-          {tab === 'profile' && <ProfileForm key={profile.id} profile={profile} onSaved={profileRes.reload} />}
+          {tab === 'profile' && <ProfileTab key={profile.id} profile={profile} onSaved={profileRes.reload} />}
           {tab === 'jobs' && <JobsTab profile={profile} onGoToProfile={() => setTab('profile')} />}
           {tab === 'apps' && <ApplicationsTab />}
         </>
