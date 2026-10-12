@@ -45,6 +45,11 @@ export function PhoneOtpForm({ purpose, idPrefix, onVerified }: Props) {
     if (!captcha) throw new AuthError('CAPTCHA_FAILED', "Please tick \"I'm not a robot\" first.")
     return captcha
   }
+  // A ticked box means the "please tick" message (or any older error) no longer applies.
+  function onCaptchaToken(token: string | null) {
+    setCaptcha(token)
+    if (token) setErrors((prev) => ({ ...prev, form: undefined }))
+  }
   // The token is spent after every request (success or not): show a new, unticked box.
   const spendCaptcha = () => { if (captchaRequired) { setCaptcha(null); setCaptchaRound((n) => n + 1) } }
 
@@ -144,7 +149,7 @@ export function PhoneOtpForm({ purpose, idPrefix, onVerified }: Props) {
 
       {/* Needed only to ask for a code: on the first screen, and on the OTP screen once the wait is over and Resend is available. */}
       {captchaRequired && (step === 'phone' || countdown.left === 0) && (
-        <HumanCheck key={captchaRound} siteKey={AUTH_CONFIG.turnstileSiteKey} onToken={setCaptcha} disabled={busy} />
+        <HumanCheck key={captchaRound} siteKey={AUTH_CONFIG.turnstileSiteKey} onToken={onCaptchaToken} disabled={busy} />
       )}
       {errors.form && <p className="ferr" role="alert">{errors.form}</p>}
       <button type="button" className="btn big full" disabled={busy} onClick={submit}>
