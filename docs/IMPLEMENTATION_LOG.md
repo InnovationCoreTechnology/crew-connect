@@ -180,6 +180,14 @@ Append-only history of what was built, why, and how to undo it. Newest entry at 
 - Not done: the release PR template was not used and the sign-off line was not filled for this first release; the live site was not redeployed (still the manual 2026-10-11 deploy); SQL rule tests were last passed on 2026-10-12 (PR #6 fixes), no database change since.
 - Rollback: Cloudflare dashboard: redeploy previous deployment; git: `git revert -m 1 4464f5f` on a `hotfix/*` branch.
 
+### 2026-10-12 · Design: admin-controlled lists (roadmap 4.6)
+- Branch: `docs/admin-controlled-lists` (from `develop`). Documentation only, nothing built.
+- Why: the owner wants designations under each job type (like job apps) and wants an admin, not a developer, to control the main list, the sub list and any other data that changes by name only.
+- What: `docs/ADMIN_CONTROLLED_LISTS.md` (what is admin-controlled vs fixed, table design with RLS and an audit log, expand/contract migration, admin "Lists" tab, build order, risks), roadmap 4.6 rewritten and blocked on new open decisions D12-D17.
+- Sources: none external; based on the repo's own schema and code (checked 2026-10-12). No library or service claims made.
+- NOT verified: nothing is implemented or tested; design needs the owner's answers to D12-D17.
+- Cost impact: none planned. Rollback: `git revert -m 1 <merge>`.
+
 ### 2026-10-12 · 2.1 follow-up · Cloudflare branch (preview) builds fixed
 - Branch: `fix/wrangler-previews-block` (from `develop`).
 - Why: after connecting GitHub to Cloudflare Workers Builds, every branch build failed at the deploy step. Build log (pasted by the owner): the build itself succeeded, then `npx wrangler preview` stopped with "Your Wrangler configuration is missing a `previews` block".
