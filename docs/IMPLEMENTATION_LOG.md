@@ -178,3 +178,11 @@ Append-only history of what was built, why, and how to undo it. Newest entry at 
 - Sources: none external; based on the repo's own schema and code (checked 2026-10-12). No library or service claims made.
 - NOT verified: nothing is implemented or tested; design needs the owner's answers to D12-D17.
 - Cost impact: none planned. Rollback: `git revert -m 1 <merge>`.
+
+### 2026-10-12 · 2.1 follow-up · Cloudflare branch (preview) builds fixed
+- Branch: `fix/wrangler-previews-block` (from `develop`).
+- Why: after connecting GitHub to Cloudflare Workers Builds, every branch build failed at the deploy step. Build log (pasted by the owner): the build itself succeeded, then `npx wrangler preview` stopped with "Your Wrangler configuration is missing a `previews` block".
+- What changed: `web/wrangler.jsonc` gets `"previews": {}` (valid when empty). Production settings stay at the top level.
+- Source (official, checked 2026-10-12): https://developers.cloudflare.com/workers/previews/configuration/ ("The `previews` block is required, but it can be empty if your Preview does not need separate settings").
+- Verification: `npm run build` clean; `npx wrangler deploy --dry-run` accepts the config and reads the same 13 asset files. NOT verified: that the next Cloudflare branch build succeeds (it runs on the PR); the docs do not state directly that the empty block leaves `wrangler deploy` unchanged, the dry run shows no change.
+- Cost impact: none. Rollback: `git revert -m 1 <merge>`.
