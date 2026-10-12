@@ -219,3 +219,22 @@ Append-only history of what was built, why, and how to undo it. Newest entry at 
 - Changed in `docs/ADMIN_DASHBOARD.md` section 5, decisions and risks; roadmap D21 ticked with the answer, D26 (hard delete rules) and D27 (who may add / delete admins) opened.
 - Finding from the schema (checked in `supabase/migrations/20261011130000_core_schema.sql`): deleting a candidate works (applications and unlocks cascade, ledger rows keep the amount and lose the candidate link); deleting an employer is BLOCKED while it has wallet ledger rows (`on delete restrict`, deliberate so money records cannot vanish). The design needs the owner's choice in D26.
 - NOT verified: Supabase Auth admin delete behaviour in our Edge Function is a plan, not tested. Docs only, nothing built.
+
+### 2026-10-12 · Admin Overview v1 (roadmap 4.8, build step 1)
+- Branch: `feat/admin-overview` (from `develop`).
+- Why: first build task of the admin dashboard design (docs/ADMIN_DASHBOARD.md): the admin sees companies, candidates, jobs, applications, unlocks and revenue for a chosen period.
+- What changed:
+  - Database: migration `20261012120000_admin_overview.sql` adds `public.admin_overview(p_from, p_to)` (admin only, security definer, `search_path = ''`, closed to anon). Totals are all-time; `new_*` counts rows created in [from, to). One call, five single-pass aggregates, no joins. Rollback: `supabase/rollback/20261012120000_admin_overview.down.sql`.
+  - Web: new Overview tab (default) with period chips (Today, Last 7 days, Last 30 days, All time; days start at midnight IST, decision D25); tiles for companies (approved / pending / new), candidates (complete profile / new), jobs, applications, numbers unlocked, revenue (labelled "demo credits"); Visitors, SMS and service cost and Net show "Not connected yet" with the roadmap item that unlocks them; a "N companies waiting for approval" shortcut to the Employers tab. The old six-tile header and `getAdminStats` were replaced (`AdminStats` type and the tables' `onChanged` prop removed). `database.types.ts` updated from a fresh generation.
+  - The database function `admin_stats` is no longer used by the app; it is kept for now (the live site on `main` still calls it until the next release) and can be dropped in a cleanup migration afterwards.
+- Verification:
+  - SQL tests: ran the admin part of `supabase/tests/rules.test.sql` against the project (rolled back): "ALL TESTS PASSED (rolled back)" for the setup, candidate / employer / anon refusals of `admin_overview`, totals matching the tables, future / current / past range, reversed range -> INVALID_RANGE. NOT re-run in this task: the OTP sections of the same file (untouched by this change). The test file in the repo also contains the two extra refusal checks that were run in that call.
+  - Reversal script run in a rolled-back transaction: `admin_overview` removed, `admin_stats` intact.
+  - Live data check as the admin (rolled back): 22 candidates (21 with a complete profile), 5 employers (3 approved, 2 pending), 5 jobs, 3 applications, 1 unlock, revenue 0; 7.5 ms. (Seeded dev data.)
+  - IST period boundaries checked with a script (today at 23:30 IST and at 00:30 IST the next day, 7 and 30 days, all time).
+  - `npm run lint` and `npm run build` clean; first load 144.17 KB gzip; admin chunk 2.13 KB gzip.
+- NOT verified: the screen in a browser (an admin login is the owner's; use the Cloudflare preview of the PR). The migration was applied to the single Supabase project (dev = prod) on 2026-10-12 before this PR is merged; it only adds a function nothing else calls, so `main` is unaffected. No unit tests for `overviewRange` in the repo (Vitest arrives with roadmap 2.4); it was checked with a script.
+- Cost impact: none. Dependencies changed: none.
+- Rollback: `git revert -m 1 <merge>`; database: run the rollback script as a new migration.
+- Next in the build order: audit table (4.9), then Approvals queue.
+
