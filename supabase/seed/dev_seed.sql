@@ -6,14 +6,17 @@
 --   __CANDIDATE_PASSWORD__   __EMPLOYER_PASSWORD__   __ADMIN_PASSWORD__
 -- The other fake people get random passwords nobody knows. Only run this on the DEV project.
 --
--- HOW the logins are made: rows are inserted into auth.users / auth.identities by hand with a bcrypt hash
--- (extensions.crypt). This is NOT an officially documented way; the supported alternative is the Auth Admin API
--- (https://supabase.com/docs/reference/javascript/auth-admin-createuser). UNVERIFIED that Supabase Auth accepts these rows
--- until a login has been tried with the Phone provider enabled.
+-- HOW the logins are made: a login is the hidden email-style identity "<mobile>@users.crewconnect.invalid" + password (see
+-- supabase/migrations/20261011140000_own_otp_accounts.sql). Rows are inserted into auth.users / auth.identities by hand with
+-- a bcrypt hash (extensions.crypt). This is not an officially documented way (the supported one is the Auth Admin API), but
+-- VERIFIED 2026-10-11: Supabase Auth accepts these rows and password login works.
+-- It also lists 10 DEV test numbers (9000000001-10) that get the fixed OTP 123456 and send no SMS, so Register and
+-- Forgot password can be tried before an SMS gateway exists. This script also sets app_settings.dev_mode = 1 (it defaults to 0:
+-- with 0 the test numbers are ignored). NEVER run this seed on production and never set dev_mode = 1 there.
 --
 -- Accounts (mobile -> role): 9845000001 candidate (full profile, 1 application) · 9845000003 candidate (EMPTY profile)
 --   9845000002 employer (Approved, 3 free unlocks) · 9900000002 employer (Pending) · 9845000000 admin
--- ROLLBACK: delete from auth.users where phone in ('91' || <each seeded mobile>);  (profiles, candidates, employers,
+-- ROLLBACK: delete from auth.users where email = '<each seeded mobile>@users.crewconnect.invalid';  (profiles, candidates, employers,
 --   jobs and applications are removed by cascade; an employer that already has wallet_ledger rows cannot be deleted).
 
 do $seed$
@@ -29,6 +32,11 @@ begin
   if p_cand like '\_\_%' or p_emp like '\_\_%' or p_adm like '\_\_%' then
     raise exception 'Replace the three __PASSWORD__ placeholders first.';
   end if;
+
+  -- dev test numbers: fixed OTP 123456, no SMS (see header)
+  insert into private.test_phones (phone) select '90000000' || lpad(i::text, 2, '0') from generate_series(1, 10) i on conflict do nothing;
+  -- Test numbers only work while app_settings.dev_mode = 1. This switch is what protects production if this seed is ever run there by mistake.
+  insert into public.app_settings (key, value) values ('dev_mode', 1) on conflict (key) do update set value = 1;
 
   create temp table seed_accounts (phone text primary key, role text not null, pw text not null, id uuid not null default gen_random_uuid()) on commit drop;
   create temp table seed_cand (phone text, name text, type text, exp int, area text, salary int, shift text, avail text, verified boolean) on commit drop;
@@ -47,35 +55,38 @@ begin
     ('9900000003', 'employer', gen_random_uuid()::text), ('9900000004', 'employer', gen_random_uuid()::text),
     ('9845000000', 'admin', p_adm);
 
-  insert into auth.users (instance_id, id, aud, role, phone, phone_confirmed_at, encrypted_password, raw_app_meta_data, raw_user_meta_data,
+  -- Remove logins made by an earlier version of this seed (phone-style, no email): they cannot sign in any more.
+  delete from auth.users u using seed_accounts s where u.phone = '91' || s.phone and u.email is null;
+
+  insert into auth.users (instance_id, id, aud, role, email, email_confirmed_at, encrypted_password, raw_app_meta_data, raw_user_meta_data,
                           created_at, updated_at, confirmation_token, recovery_token, email_change_token_new, email_change, phone_change,
                           phone_change_token, reauthentication_token, email_change_token_current)
-    select '00000000-0000-0000-0000-000000000000', s.id, 'authenticated', 'authenticated', '91' || s.phone, now(),
-           extensions.crypt(s.pw, extensions.gen_salt('bf')), '{"provider":"phone","providers":["phone"]}', '{}',
+    select '00000000-0000-0000-0000-000000000000', s.id, 'authenticated', 'authenticated', s.phone || '@users.crewconnect.invalid', now(),
+           extensions.crypt(s.pw, extensions.gen_salt('bf')), '{"provider":"email","providers":["email"]}', '{}',
            now(), now(), '', '', '', '', '', '', '', ''  -- empty strings, not NULL: Auth fails to read NULL token columns
       from seed_accounts s
-     where not exists (select 1 from auth.users u where u.phone = '91' || s.phone);
+     where not exists (select 1 from auth.users u where u.email = s.phone || '@users.crewconnect.invalid');
 
   insert into auth.identities (id, user_id, provider_id, provider, identity_data, last_sign_in_at, created_at, updated_at)
-    select gen_random_uuid(), u.id, u.phone, 'phone',
-           json_build_object('sub', u.id::text, 'phone', u.phone, 'phone_verified', true)::jsonb, now(), now(), now()
-      from seed_accounts s join auth.users u on u.phone = '91' || s.phone
+    select gen_random_uuid(), u.id, u.id::text, 'email',
+           json_build_object('sub', u.id::text, 'email', u.email, 'email_verified', true)::jsonb, now(), now(), now()
+      from seed_accounts s join auth.users u on u.email = s.phone || '@users.crewconnect.invalid'
      where not exists (select 1 from auth.identities i where i.user_id = u.id);
 
   insert into public.profiles (id, role, phone)
-    select u.id, s.role, s.phone from seed_accounts s join auth.users u on u.phone = '91' || s.phone
+    select u.id, s.role, s.phone from seed_accounts s join auth.users u on u.email = s.phone || '@users.crewconnect.invalid'
     on conflict (id) do nothing;
 
   insert into public.candidates (id, phone_masked, name, type, exp, area, salary, shift, avail, verified)
     select u.id, left(c.phone, 2) || 'XXXXX' || substr(c.phone, 8), c.name, c.type, c.exp, c.area, c.salary, c.shift, c.avail, c.verified
-      from seed_cand c join auth.users u on u.phone = '91' || c.phone
+      from seed_cand c join auth.users u on u.email = c.phone || '@users.crewconnect.invalid'
     on conflict (id) do nothing;
 
   insert into public.employers (id, company_name, status, free_unlocks_left)
     select u.id, v.company, v.status, 3
       from (values ('9845000002', 'Prestige Facility Services', 'Approved'), ('9900000002', 'Sunrise Apartments Association', 'Pending'),
                    ('9900000003', 'Metro Housekeeping Co.', 'Pending'), ('9900000004', 'SafeGuard Security Agency', 'Approved')) v(phone, company, status)
-      join auth.users u on u.phone = '91' || v.phone
+      join auth.users u on u.email = v.phone || '@users.crewconnect.invalid'
     on conflict (id) do nothing;
 
   insert into public.jobs (employer_id, title, type, area, salary, shift, openings)
@@ -85,12 +96,12 @@ begin
                    ('9845000002', 'Housekeeping Staff – Office', 'Housekeeping', 'Marathahalli', 15000, 'Day', 6),
                    ('9900000004', 'Housekeeping Supervisor', 'Housekeeping', 'HSR Layout', 21000, 'Day', 2),
                    ('9900000002', 'Security Guard – Society', 'Security', 'Yelahanka', 16000, 'Any', 3)) j(phone, title, type, area, salary, shift, openings)
-      join auth.users u on u.phone = '91' || j.phone
+      join auth.users u on u.email = j.phone || '@users.crewconnect.invalid'
      where not exists (select 1 from public.jobs x where x.employer_id = u.id and x.title = j.title);
 
   insert into public.applications (job_id, candidate_id, status)
     select j.id, c.id, 'Shortlisted'
       from public.jobs j, auth.users c
-     where j.title = 'Security Supervisor' and c.phone = '919845000001'
+     where j.title = 'Security Supervisor' and c.email = '9845000001@users.crewconnect.invalid'
     on conflict do nothing;
 end $seed$;

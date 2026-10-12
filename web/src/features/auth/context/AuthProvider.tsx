@@ -18,7 +18,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signIn = useCallback(async (phone: string, password: string) => {
     const current = await authService.signInWithPassword(phone, password)
     if (!current) {
-      // The password was right but registration was never finished: do not leave a half-made login behind.
+      // The password was right but there is no account behind this login: do not leave a half-made session behind.
       await authService.logout()
       throw new AuthError('NOT_REGISTERED', 'Your registration was not completed. Please register again.')
     }
@@ -26,30 +26,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return current
   }, [])
 
-  const verifyOtp = useCallback(async (phone: string, otp: string, purpose: OtpPurpose) => {
-    await authService.verifyOtp(phone, otp) // this signs the person in at Supabase, but not yet in the app (user stays null)
-    const existing = await authService.getSession() // non-null = this number already has a complete account
-    if (purpose === 'register' && existing) {
-      await authService.logout()
-      throw new AuthError('ALREADY_REGISTERED', 'This number is already registered.')
-    }
-    if (purpose === 'reset' && !existing) {
-      await authService.logout()
-      throw new AuthError('NOT_REGISTERED', 'This number is not registered.')
-    }
-  }, [])
+  const checkOtp = useCallback((phone: string, otp: string, purpose: OtpPurpose) => authService.checkOtp(phone, purpose, otp), [])
 
-  const completeRegistration = useCallback(async (password: string, role: SignupRole) => {
-    await authService.setPassword(password)
-    const created = await authService.register(role)
+  const register = useCallback(async (phone: string, otp: string, password: string, role: SignupRole) => {
+    const created = await authService.register(phone, otp, password, role)
     setUser(created)
     return created
   }, [])
 
-  const completeReset = useCallback(async (password: string) => {
-    await authService.setPassword(password)
-    const current = await authService.getSession()
-    if (!current) throw new AuthError('NOT_REGISTERED', 'This number is not registered.')
+  const resetPassword = useCallback(async (phone: string, otp: string, password: string) => {
+    const current = await authService.resetPassword(phone, otp, password)
     setUser(current)
     return current
   }, [])
@@ -60,8 +46,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const value = useMemo<AuthContextValue>(
-    () => ({ user, loading, signIn, verifyOtp, completeRegistration, completeReset, logout }),
-    [user, loading, signIn, verifyOtp, completeRegistration, completeReset, logout],
+    () => ({ user, loading, signIn, checkOtp, register, resetPassword, logout }),
+    [user, loading, signIn, checkOtp, register, resetPassword, logout],
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

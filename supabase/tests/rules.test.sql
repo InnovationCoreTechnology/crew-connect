@@ -1,4 +1,4 @@
--- Database rule tests (Phase 1). Run in the Supabase SQL editor or via the MCP execute_sql tool.
+-- Database rule tests (Phase 1 + own OTP system). Run in the Supabase SQL editor or via the MCP execute_sql tool.
 -- HOW IT WORKS: everything runs inside ONE transaction that is deliberately aborted at the end, so no fixture data
 -- is kept. It pretends to be different logged-in users by setting the JWT claims and switching to the real
 -- `authenticated` / `anon` Postgres roles, so grants and RLS are exercised exactly as the browser would hit them.
@@ -18,69 +18,73 @@ declare
   v_x     uuid := '00000000-0000-0000-0000-0000000000f1'; -- non-Indian phone
   v_j1    uuid := '00000000-0000-0000-0000-0000000000b1';
   v_j2    uuid := '00000000-0000-0000-0000-0000000000b2';
-  n integer; r record; t text;
+  n integer; r record; t text; v_wrong text; k integer;
   v_raised boolean; v_msg text; v_state text; v_rows integer;
   v_all uuid[] := '{}'; v_cur_at timestamptz; v_cur_id uuid; v_cnt integer; v_iter integer := 0;
 begin
+  ------------------------------------------------------------------ clean slate (inside this rolled-back transaction)
+  delete from auth.users; -- removes any dev seed data so the counts below are exact; undone by the final rollback
+  delete from private.otp_codes;
+  delete from private.test_phones;
+
   ------------------------------------------------------------------ fixtures (as the owner)
-  insert into auth.users (id, aud, role, phone, phone_confirmed_at, created_at, updated_at) values
-    (v_admin, 'authenticated', 'authenticated', '919845000000', now(), now(), now()),
-    (v_e1,    'authenticated', 'authenticated', '919900000001', now(), now(), now()),
-    (v_e2,    'authenticated', 'authenticated', '919900000002', now(), now(), now()),
-    (v_c1,    'authenticated', 'authenticated', '919845000001', now(), now(), now()),
-    (v_c2,    'authenticated', 'authenticated', '919845000002', now(), now(), now()),
-    (v_c3,    'authenticated', 'authenticated', '919845000003', now(), now(), now()),
-    (v_c4,    'authenticated', 'authenticated', '919845000004', now(), now(), now()),
-    (v_x,     'authenticated', 'authenticated', '14155550123',  now(), now(), now());
+  insert into auth.users (id, aud, role, email, email_confirmed_at, created_at, updated_at) values
+    (v_admin, 'authenticated', 'authenticated', 't-a0@test.invalid', now(), now(), now()),
+    (v_e1,    'authenticated', 'authenticated', 't-e1@test.invalid', now(), now(), now()),
+    (v_e2,    'authenticated', 'authenticated', 't-e2@test.invalid', now(), now(), now()),
+    (v_c1,    'authenticated', 'authenticated', 't-c1@test.invalid', now(), now(), now()),
+    (v_c2,    'authenticated', 'authenticated', 't-c2@test.invalid', now(), now(), now()),
+    (v_c3,    'authenticated', 'authenticated', 't-c3@test.invalid', now(), now(), now()),
+    (v_c4,    'authenticated', 'authenticated', 't-c4@test.invalid', now(), now(), now()),
+    (v_x,     'authenticated', 'authenticated', 't-x@test.invalid',  now(), now(), now());
 
-  ------------------------------------------------------------------ registration
-  perform set_config('request.jwt.claims', json_build_object('sub', v_c1, 'role', 'authenticated')::text, true);
-  set local role authenticated;
-  perform public.register_account('candidate');
-  reset role;
+  ------------------------------------------------------------------ account creation (server-only functions, run here as the owner)
+  perform public.auth_create_account(v_c1, '9111000001', 'candidate');
   select c.phone_masked into t from public.candidates c where c.id = v_c1;
-  if t is distinct from '98XXXXX001' then raise exception 'FAIL: phone mask is % (want 98XXXXX001)', t; end if;
+  if t is distinct from '91XXXXX001' then raise exception 'FAIL: phone mask is % (want 91XXXXX001)', t; end if;
   select pr.phone into t from public.profiles pr where pr.id = v_c1;
-  if t is distinct from '9845000001' then raise exception 'FAIL: stored phone is %', t; end if;
+  if t is distinct from '9111000001' then raise exception 'FAIL: stored phone is %', t; end if;
 
-  set local role authenticated;
   v_raised := false;
-  begin perform public.register_account('candidate');
+  begin perform public.auth_create_account(v_c1, '9111000001', 'candidate');
   exception when others then v_raised := true; v_msg := sqlerrm; end;
-  reset role;
   if not v_raised or v_msg <> 'ALREADY_REGISTERED' then raise exception 'FAIL: double registration (got %)', coalesce(v_msg, 'no error'); end if;
 
-  perform set_config('request.jwt.claims', json_build_object('sub', v_x, 'role', 'authenticated')::text, true);
-  set local role authenticated;
   v_raised := false;
-  begin perform public.register_account('admin');
+  begin perform public.auth_create_account(v_x, '9111000099', 'admin');
   exception when others then v_raised := true; v_msg := sqlerrm; end;
-  if not v_raised or v_msg <> 'INVALID_ROLE' then reset role; raise exception 'FAIL: self-registering as admin was not refused (got %)', coalesce(v_msg, 'no error'); end if;
+  if not v_raised or v_msg <> 'INVALID_ROLE' then raise exception 'FAIL: creating an admin through the account function was not refused (got %)', coalesce(v_msg, 'no error'); end if;
   v_raised := false;
-  begin perform public.register_account('candidate');
+  begin perform public.auth_create_account(v_x, '4155550123', 'candidate');
   exception when others then v_raised := true; v_msg := sqlerrm; end;
-  reset role;
   if not v_raised or v_msg <> 'INVALID_PHONE' then raise exception 'FAIL: non-Indian phone accepted (got %)', coalesce(v_msg, 'no error'); end if;
 
-  perform set_config('request.jwt.claims', '', true); -- not logged in at all
-  set local role authenticated;
-  v_raised := false;
-  begin perform public.register_account('candidate');
-  exception when others then v_raised := true; v_msg := sqlerrm; end;
-  reset role;
-  if not v_raised or v_msg <> 'FORBIDDEN' then raise exception 'FAIL: register without login (got %)', coalesce(v_msg, 'no error'); end if;
+  -- browsers (logged in or not) must not be able to call ANY server-only function
+  foreach t in array array[
+    $$public.auth_is_test_phone('9111000001')$$,
+    $$public.auth_otp_issue('9222000050', 'register')$$,
+    $$public.auth_otp_check('9222000050', 'register', '123456', false)$$,
+    $$public.auth_create_account('00000000-0000-0000-0000-0000000000f1', '9111000098', 'candidate')$$,
+    $$public.auth_find_user('9111000001')$$
+  ] loop
+    perform set_config('request.jwt.claims', json_build_object('sub', v_c1, 'role', 'authenticated')::text, true);
+    set local role authenticated;
+    v_raised := false;
+    begin execute 'select ' || t; exception when others then v_raised := true; v_state := sqlstate; end;
+    reset role;
+    if not v_raised or v_state <> '42501' then raise exception 'FAIL: logged-in browser can call %', t; end if;
+    set local role anon;
+    v_raised := false;
+    begin execute 'select ' || t; exception when others then v_raised := true; v_state := sqlstate; end;
+    reset role;
+    if not v_raised or v_state <> '42501' then raise exception 'FAIL: anonymous browser can call %', t; end if;
+  end loop;
 
-  -- the rest register through the same function
-  perform set_config('request.jwt.claims', json_build_object('sub', v_c2, 'role', 'authenticated')::text, true);
-  set local role authenticated; perform public.register_account('candidate'); reset role;
-  perform set_config('request.jwt.claims', json_build_object('sub', v_c3, 'role', 'authenticated')::text, true);
-  set local role authenticated; perform public.register_account('candidate'); reset role;
-  perform set_config('request.jwt.claims', json_build_object('sub', v_c4, 'role', 'authenticated')::text, true);
-  set local role authenticated; perform public.register_account('candidate'); reset role;
-  perform set_config('request.jwt.claims', json_build_object('sub', v_e1, 'role', 'authenticated')::text, true);
-  set local role authenticated; perform public.register_account('employer'); reset role;
-  perform set_config('request.jwt.claims', json_build_object('sub', v_e2, 'role', 'authenticated')::text, true);
-  set local role authenticated; perform public.register_account('employer'); reset role;
+  perform public.auth_create_account(v_c2, '9111000002', 'candidate');
+  perform public.auth_create_account(v_c3, '9111000003', 'candidate');
+  perform public.auth_create_account(v_c4, '9111000004', 'candidate');
+  perform public.auth_create_account(v_e1, '9111000011', 'employer');
+  perform public.auth_create_account(v_e2, '9111000012', 'employer');
 
   select e.free_unlocks_left into n from public.employers e where e.id = v_e1;
   if n <> 3 then raise exception 'FAIL: new employer free unlocks is % (want 3 from app_settings)', n; end if;
@@ -128,7 +132,7 @@ begin
   end loop;
 
   v_raised := false;
-  begin insert into public.profiles (id, role, phone) values (v_c1, 'admin', '9845000099');
+  begin insert into public.profiles (id, role, phone) values (v_c1, 'admin', '9111000098');
   exception when others then v_raised := true; v_state := sqlstate; end;
   if not v_raised or v_state <> '42501' then reset role; raise exception 'FAIL: client could insert a profile/role'; end if;
 
@@ -238,7 +242,7 @@ begin
   perform set_config('request.jwt.claims', json_build_object('sub', v_e1, 'role', 'authenticated')::text, true);
   set local role authenticated;
   select * into r from public.unlock_candidate(v_c1);
-  if r.phone <> '9845000001' or r.free_unlocks_left <> 2 or r.charged or r.unlocked_count <> 1 then
+  if r.phone <> '9111000001' or r.free_unlocks_left <> 2 or r.charged or r.unlocked_count <> 1 then
     reset role; raise exception 'FAIL: first free unlock result % / % / % / %', r.phone, r.free_unlocks_left, r.charged, r.unlocked_count;
   end if;
   select * into r from public.unlock_candidate(v_c1); -- again: idempotent, no second charge
@@ -253,7 +257,7 @@ begin
   end loop;
 
   select s.phone, s.unlocked into r from public.search_candidates(p_query => 'ravi') s;
-  if r.phone is distinct from '9845000001' or r.unlocked is not true then reset role; raise exception 'FAIL: unlocked number not shown in search'; end if;
+  if r.phone is distinct from '9111000001' or r.unlocked is not true then reset role; raise exception 'FAIL: unlocked number not shown in search'; end if;
   select count(*) into n from public.search_candidates(p_limit => 50) s where s.phone is not null;
   if n <> 1 then reset role; raise exception 'FAIL: only the unlocked candidate may show a phone (got %)', n; end if;
   reset role;
@@ -311,7 +315,7 @@ begin
   if n <> 1 then raise exception 'FAIL: applications = % (want 1)', n; end if;
 
   ------------------------------------------------------------------ admin
-  insert into public.profiles (id, role, phone) values (v_admin, 'admin', '9845000000'); -- owner creates admins
+  insert into public.profiles (id, role, phone) values (v_admin, 'admin', '9111000000'); -- owner creates admins
   perform set_config('request.jwt.claims', json_build_object('sub', v_e1, 'role', 'authenticated')::text, true);
   set local role authenticated;
   v_raised := false;
@@ -342,6 +346,147 @@ begin
   select count(*) into n from public.admin_list_employers() a where a.status = 'Approved';
   reset role;
   if n <> 2 then raise exception 'FAIL: admin approval did not stick (% approved)', n; end if;
+
+  ------------------------------------------------------------------ OTP: codes, limits, lock-out (own SMS-code system)
+  select * into r from public.auth_otp_issue('9222000001', 'register');
+  if r.code !~ '^[0-9]{6}$' or r.is_test then raise exception 'FAIL: issued code % / test=%', r.code, r.is_test; end if;
+  select o.code_hash into t from private.otp_codes o where o.phone = '9222000001';
+  if t = r.code or t is null then raise exception 'FAIL: the code is stored in plain form'; end if;
+
+  v_raised := false;
+  begin perform * from public.auth_otp_issue('9222000001', 'register'); -- again straight away
+  exception when others then v_raised := true; v_msg := sqlerrm; end;
+  if not v_raised or v_msg <> 'RATE_LIMITED' then raise exception 'FAIL: no resend cooldown (got %)', coalesce(v_msg, 'no error'); end if;
+
+  v_wrong := case when r.code = '000000' then '111111' else '000000' end;
+  for k in 1..5 loop
+    if public.auth_otp_check('9222000001', 'register', v_wrong) <> 'INVALID_OTP' then raise exception 'FAIL: wrong code %-th time not refused', k; end if;
+  end loop;
+  if public.auth_otp_check('9222000001', 'register', r.code) <> 'LOCKED' then raise exception 'FAIL: code not locked after 5 wrong guesses (a right guess must NOT work any more)'; end if;
+
+  update private.otp_codes set created_at = created_at - interval '120 seconds' where phone = '9222000001'; -- cooldown over
+  select * into r from public.auth_otp_issue('9222000001', 'register'); -- a new code retires the old one
+  v_wrong := case when r.code = '000000' then '111111' else '000000' end;
+  if public.auth_otp_check('9222000001', 'register', v_wrong) <> 'INVALID_OTP' then raise exception 'FAIL: wrong code accepted for the new code'; end if;
+  if public.auth_otp_check('9222000001', 'register', r.code) <> 'OK' then raise exception 'FAIL: right code refused (attempts must be per code)'; end if;
+  if public.auth_otp_check('9222000001', 'register', r.code) <> 'OK' then raise exception 'FAIL: a non-consuming check must be repeatable'; end if;
+  if public.auth_otp_check('9222000001', 'reset', r.code) <> 'OTP_EXPIRED' then raise exception 'FAIL: a register code worked for password reset'; end if;
+  if public.auth_otp_check('9222000001', 'register', r.code, true) <> 'OK' then raise exception 'FAIL: consuming check failed'; end if;
+  if public.auth_otp_check('9222000001', 'register', r.code) <> 'OTP_EXPIRED' then raise exception 'FAIL: a used code worked again'; end if;
+
+  select * into r from public.auth_otp_issue('9222000004', 'register');
+  update private.otp_codes set expires_at = now() - interval '1 second' where phone = '9222000004';
+  if public.auth_otp_check('9222000004', 'register', r.code) <> 'OTP_EXPIRED' then raise exception 'FAIL: an expired code worked'; end if;
+
+  v_raised := false;
+  begin perform * from public.auth_otp_issue('9111000001', 'register'); -- already registered
+  exception when others then v_raised := true; v_msg := sqlerrm; end;
+  if not v_raised or v_msg <> 'ALREADY_REGISTERED' then raise exception 'FAIL: OTP issued to a registered number for registration (got %)', coalesce(v_msg, 'no error'); end if;
+  v_raised := false;
+  begin perform * from public.auth_otp_issue('9222000009', 'reset'); -- never registered
+  exception when others then v_raised := true; v_msg := sqlerrm; end;
+  if not v_raised or v_msg <> 'NOT_REGISTERED' then raise exception 'FAIL: reset OTP issued to an unknown number (got %)', coalesce(v_msg, 'no error'); end if;
+  v_raised := false;
+  begin perform * from public.auth_otp_issue('12345', 'register');
+  exception when others then v_raised := true; v_msg := sqlerrm; end;
+  if not v_raised or v_msg <> 'INVALID_INPUT' then raise exception 'FAIL: bad phone accepted by OTP issue (got %)', coalesce(v_msg, 'no error'); end if;
+
+  update public.app_settings set value = 1 where key = 'dev_mode'; -- test numbers only count on a DEV project
+  insert into private.test_phones (phone) values ('9222000002'); -- dev test number: fixed code, no SMS
+  select * into r from public.auth_otp_issue('9222000002', 'register');
+  if r.code <> '123456' or r.is_test is not true then raise exception 'FAIL: test number did not get the fixed code'; end if;
+  if public.auth_otp_check('9222000002', 'register', '123456', true) <> 'OK' then raise exception 'FAIL: test code refused'; end if;
+
+  update public.app_settings set value = 2 where key = 'otp_max_sends_per_hour';
+  select * into r from public.auth_otp_issue('9222000003', 'register');
+  update private.otp_codes set created_at = created_at - interval '120 seconds' where phone = '9222000003';
+  select * into r from public.auth_otp_issue('9222000003', 'register');
+  update private.otp_codes set created_at = created_at - interval '120 seconds' where phone = '9222000003';
+  v_raised := false;
+  begin perform * from public.auth_otp_issue('9222000003', 'register'); -- third code within the hour
+  exception when others then v_raised := true; v_msg := sqlerrm; end;
+  if not v_raised or v_msg <> 'RATE_LIMITED' then raise exception 'FAIL: no per-number hourly cap (got %)', coalesce(v_msg, 'no error'); end if;
+
+  update public.app_settings set value = 0 where key = 'otp_global_sends_per_hour';
+  v_raised := false;
+  begin perform * from public.auth_otp_issue('9222000005', 'register');
+  exception when others then v_raised := true; v_msg := sqlerrm; end;
+  if not v_raised or v_msg <> 'RATE_LIMITED' then raise exception 'FAIL: no project-wide hourly cap (got %)', coalesce(v_msg, 'no error'); end if;
+
+  if public.auth_find_user('9111000001') is distinct from v_c1 or public.auth_find_user('9999999999') is not null then raise exception 'FAIL: auth_find_user'; end if;
+
+  ------------------------------------------------------------------ review fixes (PR #6 findings 1-8)
+  update public.app_settings set value = 300 where key = 'otp_global_sends_per_hour';
+  update public.app_settings set value = 5 where key = 'otp_max_sends_per_hour';
+
+  -- (3) test numbers are ignored unless dev_mode = 1
+  insert into private.test_phones (phone) values ('9222000010');
+  update public.app_settings set value = 0 where key = 'dev_mode';
+  if public.auth_is_test_phone('9222000010') then raise exception 'FAIL: test number honoured with dev_mode = 0'; end if;
+  select * into r from public.auth_otp_issue('9222000010', 'register');
+  if r.is_test then raise exception 'FAIL: test number got the fixed-code treatment with dev_mode = 0'; end if;
+  update public.app_settings set value = 1 where key = 'dev_mode';
+  if not public.auth_is_test_phone('9222000010') then raise exception 'FAIL: test number ignored with dev_mode = 1'; end if;
+
+  -- (2) rate limits run BEFORE the registered / not-registered checks: no free probing right after a code was sent
+  select * into r from public.auth_otp_issue('9111000001', 'reset');
+  v_raised := false;
+  begin perform * from public.auth_otp_issue('9111000001', 'register');
+  exception when others then v_raised := true; v_msg := sqlerrm; end;
+  if not v_raised or v_msg <> 'RATE_LIMITED' then raise exception 'FAIL: probe answered % instead of RATE_LIMITED (limits must run first)', coalesce(v_msg, 'no error'); end if;
+
+  -- (2) per-IP limit, hashed storage, missing IP cannot be limited
+  update public.app_settings set value = 2 where key = 'otp_max_requests_per_ip_per_hour';
+  if not public.auth_ip_allow('203.0.113.9') or not public.auth_ip_allow('203.0.113.9') then raise exception 'FAIL: first two requests from an IP must pass'; end if;
+  if public.auth_ip_allow('203.0.113.9') then raise exception 'FAIL: third request from the same IP was not limited'; end if;
+  if not public.auth_ip_allow('203.0.113.10') then raise exception 'FAIL: a different IP was limited'; end if;
+  if not public.auth_ip_allow(null) or not public.auth_ip_allow('  ') then raise exception 'FAIL: a missing IP must not be limited'; end if;
+  select h.ip_hash into t from private.otp_ip_hits h order by h.id limit 1;
+  if t is null or t like '%203.0.113%' or length(t) <> 64 then raise exception 'FAIL: IP is not stored as a sha-256 hash (got %)', t; end if;
+
+  -- (4) retention: old codes and old IP hits are deleted automatically
+  insert into private.otp_codes (phone, purpose, code_hash, expires_at, created_at)
+  values ('9222000020', 'register', 'x', now() - interval '9 days', now() - interval '10 days');
+  insert into private.otp_ip_hits (ip_hash, created_at) values ('old-hash', now() - interval '2 days');
+  select * into r from public.auth_otp_issue('9222000021', 'register');
+  if exists (select 1 from private.otp_codes o where o.phone = '9222000020') then raise exception 'FAIL: a 10-day-old OTP row was not deleted'; end if;
+  if exists (select 1 from private.otp_ip_hits h where h.ip_hash = 'old-hash') then raise exception 'FAIL: a 2-day-old IP hit was not deleted'; end if;
+  if not exists (select 1 from private.otp_codes o where o.phone = '9222000021') then raise exception 'FAIL: the new code was deleted by the purge'; end if;
+
+  -- (1) a login without an account (failed registration) can be found and finished; real accounts are not reported as orphans
+  insert into auth.users (id, aud, role, email, email_confirmed_at, created_at, updated_at)
+  values ('00000000-0000-0000-0000-0000000000d1', 'authenticated', 'authenticated', '9333000001@users.crewconnect.invalid', now(), now(), now());
+  if public.auth_find_orphan_login('9333000001') is distinct from '00000000-0000-0000-0000-0000000000d1'::uuid then raise exception 'FAIL: orphan login not found'; end if;
+  perform public.auth_create_account('00000000-0000-0000-0000-0000000000d1', '9333000001', 'candidate');
+  if public.auth_find_orphan_login('9333000001') is not null then raise exception 'FAIL: a finished account is still reported as an orphan'; end if;
+  if public.auth_find_orphan_login('9444000001') is not null then raise exception 'FAIL: unknown number reported as an orphan'; end if;
+
+  -- (8) sessions end after a reset, and only for that user
+  insert into auth.sessions (id, user_id, created_at, updated_at) values (gen_random_uuid(), v_c1, now(), now()), (gen_random_uuid(), v_c1, now(), now()), (gen_random_uuid(), v_c2, now(), now());
+  perform public.auth_revoke_sessions(v_c1);
+  select count(*) into n from auth.sessions where user_id = v_c1;
+  if n <> 0 then raise exception 'FAIL: % session(s) of the user survived the revoke', n; end if;
+  select count(*) into n from auth.sessions where user_id = v_c2;
+  if n <> 1 then raise exception 'FAIL: another user''s session was removed (left %)', n; end if;
+
+  -- the new server-only functions are closed to browsers (logged in or not)
+  foreach t in array array[
+    $$public.auth_ip_allow('203.0.113.77')$$,
+    $$public.auth_find_orphan_login('9333000001')$$,
+    $$public.auth_revoke_sessions('00000000-0000-0000-0000-0000000000c1')$$
+  ] loop
+    perform set_config('request.jwt.claims', json_build_object('sub', v_c1, 'role', 'authenticated')::text, true);
+    set local role authenticated;
+    v_raised := false;
+    begin execute 'select ' || t; exception when others then v_raised := true; v_state := sqlstate; end;
+    reset role;
+    if not v_raised or v_state <> '42501' then raise exception 'FAIL: logged-in browser can call %', t; end if;
+    set local role anon;
+    v_raised := false;
+    begin execute 'select ' || t; exception when others then v_raised := true; v_state := sqlstate; end;
+    reset role;
+    if not v_raised or v_state <> '42501' then raise exception 'FAIL: anonymous browser can call %', t; end if;
+  end loop;
 
   raise exception 'ALL TESTS PASSED (rolled back)';
 end;

@@ -11,6 +11,7 @@ Project: **crew-connect**, region **ap-south-1 (Mumbai)**, ref `qehkkituvqaishys
 | `tests/` | `rules.test.sql`: proves the security and money rules. | Run after every migration. |
 | `admin/` | `create_admin.sql`: how an admin is made (never from the app). | By hand, once per admin. |
 | `seed/` | `dev_seed.sql`: fake test accounts and data (DEV only). | By hand, when you want test data. |
+| `functions/` | Edge Functions (`account-auth`: register, OTP, password reset). | Deployed with the Supabase MCP `deploy_edge_function` or the CLI. The deployed copy must match the repo; its `verify_jwt` is `false` on purpose (it runs before login). |
 
 ## Rules for every change (from CLAUDE.md)
 1. New migration file `YYYYMMDDHHMMSS_name.sql` + its `rollback/…down.sql`. Never edit a migration that was already applied.
@@ -33,8 +34,19 @@ they are the API, and each one checks the caller's role itself (proved by `tests
 - Concurrency of two simultaneous unlocks is protected by `SELECT … FOR UPDATE` on the employer row and the primary key on
   `unlocks`, but a true parallel test is not automated yet (the SQL test runs in one session).
 
+## Safety switches (app_settings)
+- `dev_mode` (default **0**): only when 1 do the dev test numbers in `private.test_phones` work (fixed OTP 123456, no SMS). The dev seed sets it to 1. **Never set it to 1 on production.**
+- `otp_*`: cooldown, hourly caps (per number, per caller IP, whole project), wrong-guess limit, expiry, and `otp_retention_days` (old OTP rows are deleted automatically whenever a new OTP is requested).
+
+## Tests
+- `tests/rules.test.sql` - database rules (run in the SQL editor / MCP; ends with "ALL TESTS PASSED (rolled back)").
+- `tests/turnstile.test.mjs` - the CAPTCHA verification module against Cloudflare's real Siteverify with its dummy keys: `node supabase/tests/turnstile.test.mjs` (Node 22.18+, needs internet, no account).
+
+## Edge Function secrets
+Supabase injects `SUPABASE_URL` and the secret keys into every function. We add one: `TURNSTILE_SECRET_KEY` (the CAPTCHA secret from Cloudflare -> Turnstile). When the SMS gateway is connected, its credentials go in the same place (Edge Functions -> Secrets), never in the repo. With no `TURNSTILE_SECRET_KEY` set, only the dev test numbers work.
+
 ## Dev data
-`seed/dev_seed.sql` creates fake logins WITH passwords (candidate, employer, admin and 23 other people, 5 jobs) so every screen can
+`seed/dev_seed.sql` creates fake logins WITH passwords (candidate, employer, admin and 23 other people, 5 jobs) and lists the 10 DEV test numbers (fixed OTP 123456, no SMS) so every screen can
 be tried without SMS. Replace the three password placeholders with your own passwords first, keep them in a git-ignored file
 (for example `web/.seed-credentials.local`), and run it only on the DEV project. It is safe to run again. The earlier key-based
 script `web/scripts/seed-dev.mjs` was removed because it created logins without passwords.

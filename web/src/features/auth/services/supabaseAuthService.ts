@@ -1,101 +1,92 @@
 import { isAuthApiError } from '@supabase/supabase-js'
 import { supabase } from '../../../lib/supabase'
-import { AUTH_CONFIG } from '../config'
 import type { Role, User } from '../types'
-import { AuthError, type AuthService } from './types'
+import { AuthError, type AuthErrorCode, type AuthService } from './types'
 
-// REAL auth backend: Supabase Auth, phone + password, with an SMS OTP to prove the number.
-//   Log in:   signInWithPassword          https://supabase.com/docs/guides/auth/passwords#signing-in-a-with-a-phone-number-and-password
-//   Register: signInWithOtp -> verifyOtp -> updateUser({ password }) -> register_account() (role, server-side, see supabase/migrations)
-//   Forgot:   signInWithOtp -> verifyOtp -> updateUser({ password })      (UNVERIFIED as one flow until tried with real SMS)
-// OTP docs: https://supabase.com/docs/guides/auth/phone-login · Error codes: https://supabase.com/docs/guides/auth/debugging/error-codes
-// Security note from Supabase: phone numbers get recycled by carriers, so a recycled number could reach an old account
-// (https://supabase.com/docs/guides/auth/passwords). Adding MFA is the documented mitigation (not built yet).
+// REAL auth backend. We do NOT use Supabase's phone provider (it needs Twilio-style credentials and does not support MSG91).
+//   * A person's login in Supabase Auth is a hidden email-style identity "<10 digits>@users.crewconnect.invalid" + password.
+//     Log in = signInWithPassword (VERIFIED 2026-10-11: works with no phone provider).
+//   * Register / forgot password = our OTP, kept in the database and driven by the Edge Function `account-auth`
+//     (supabase/functions/account-auth, supabase/migrations/20261011140000_own_otp_accounts.sql).
+//   * The role and the real mobile number live in the `profiles` table (read with Row Level Security).
+// Docs: https://supabase.com/docs/guides/auth/passwords · https://supabase.com/docs/reference/javascript/functions-invoke
+//       error codes: https://supabase.com/docs/guides/auth/debugging/error-codes
 
-const toE164 = (phone: string) => `${AUTH_CONFIG.countryCode}${phone}`
-const toNational = (authPhone: string) => authPhone.slice(-AUTH_CONFIG.phoneLength) // Auth returns 919845000001 (with or without +)
+// The same rule is written in the Edge Function. If you change it, change both AND migrate existing logins.
+const toEmail = (phone: string) => `${phone}@users.crewconnect.invalid`
 
-// Turns a Supabase error into one of our friendly codes. Unknown cases stay UNKNOWN.
-function toAuthError(err: unknown, fallback: string): AuthError {
-  if (isAuthApiError(err)) {
-    switch (err.code) {
-      case 'over_sms_send_rate_limit':
-      case 'over_request_rate_limit':
-        return new AuthError('RATE_LIMITED', 'Too many attempts. Please wait a minute and try again.')
-      case 'otp_expired':
-        return new AuthError('OTP_EXPIRED', 'This OTP has expired. Please request a new one.')
-      case 'sms_send_failed':
-        return new AuthError('SMS_FAILED', 'We could not send the SMS. Please try again.')
-      // Phone sign-in is switched off / no SMS provider on the Supabase project (an owner setup issue, not the user's).
-      // VERIFIED 2026-10-11: with the Phone provider disabled even password login answers this ("Phone logins are disabled").
-      case 'phone_provider_disabled':
-        return new AuthError('SMS_FAILED', 'Phone login is not available right now. Please try again later.')
-      // Wrong number OR wrong password: one message for both on purpose.
-      case 'invalid_credentials':
-        return new AuthError('WRONG_PASSWORD', 'Wrong mobile number or password.')
-      case 'weak_password':
-        return new AuthError('WEAK_PASSWORD', 'This password is too weak. Use a longer one with letters and numbers.')
-      case 'same_password':
-        return new AuthError('SAME_PASSWORD', 'Please choose a different password from your old one.')
-      // sendOtp(reset) for an unknown number (shouldCreateUser:false). VERIFIED 2026-10-11 on the live project:
-      // it answers `otp_disabled` (HTTP 422, "Signups not allowed for otp"). `signup_disabled` is a safe alias (unverified).
-      case 'signup_disabled':
-      case 'otp_disabled':
-        return new AuthError('NOT_REGISTERED', 'This number is not registered.')
-    }
-  }
-  return new AuthError('UNKNOWN', fallback)
+const MESSAGES: Record<string, { code: AuthErrorCode; text: string }> = {
+  ALREADY_REGISTERED: { code: 'ALREADY_REGISTERED', text: 'This number is already registered.' },
+  NOT_REGISTERED: { code: 'NOT_REGISTERED', text: 'This number is not registered.' },
+  RATE_LIMITED: { code: 'RATE_LIMITED', text: 'Too many OTP requests. Please wait a minute and try again.' },
+  SMS_FAILED: { code: 'SMS_FAILED', text: 'We could not send the SMS right now. Please try again later.' },
+  CAPTCHA_FAILED: { code: 'CAPTCHA_FAILED', text: 'Please complete the security check and try again.' },
+  INVALID_OTP: { code: 'INVALID_OTP', text: 'Wrong OTP.' },
+  OTP_EXPIRED: { code: 'OTP_EXPIRED', text: 'This OTP has expired. Please request a new one.' },
+  TOO_MANY_ATTEMPTS: { code: 'TOO_MANY_ATTEMPTS', text: 'Too many wrong attempts. Please request a new OTP.' },
+  WEAK_PASSWORD: { code: 'WEAK_PASSWORD', text: 'This password is too weak. Use at least 8 characters with letters and numbers.' },
+  SAME_PASSWORD: { code: 'SAME_PASSWORD', text: 'Please choose a different password from your old one.' },
+}
+const UNKNOWN = new AuthError('UNKNOWN', 'Something went wrong. Please try again.')
+
+interface AccountReply { ok: boolean; code?: string }
+
+// Calls the Edge Function. It answers HTTP 200 with { ok: false, code } for expected problems (see index.ts there).
+async function callAccount(body: Record<string, unknown>): Promise<void> {
+  const { data, error } = await supabase.functions.invoke<AccountReply>('account-auth', { body })
+  if (error || !data) throw UNKNOWN
+  if (data.ok) return
+  const known = data.code ? MESSAGES[data.code] : undefined
+  throw known ? new AuthError(known.code, known.text) : UNKNOWN
 }
 
 async function loadUser(): Promise<User | null> {
-  // getSession() reads the stored session (fast, no network). It is only used to learn the id/phone;
-  // the ROLE comes from the database, which validates the token itself (Row Level Security).
+  // getSession() reads the stored session (fast, no network). It only tells us WHO is logged in;
+  // the role and the number come from the database, which validates the token itself (Row Level Security).
   const { data } = await supabase.auth.getSession()
   const authUser = data.session?.user
-  if (!authUser?.phone) return null
+  if (!authUser) return null
 
-  const { data: profile, error } = await supabase.from('profiles').select('role').eq('id', authUser.id).maybeSingle()
-  if (error || !profile) return null // not registered yet, or the token was rejected
-  return { id: authUser.id, phone: toNational(authUser.phone), role: profile.role as Role }
+  const { data: profile, error } = await supabase.from('profiles').select('role,phone').eq('id', authUser.id).maybeSingle()
+  if (error || !profile) return null // no account for this login, or the token was rejected
+  return { id: authUser.id, phone: profile.phone, role: profile.role as Role }
+}
+
+async function signIn(phone: string, password: string): Promise<User | null> {
+  const { error } = await supabase.auth.signInWithPassword({ email: toEmail(phone), password })
+  if (error) {
+    // Wrong number OR wrong password: one message for both on purpose.
+    if (isAuthApiError(error) && error.code === 'invalid_credentials') {
+      throw new AuthError('WRONG_PASSWORD', 'Wrong mobile number or password.')
+    }
+    if (isAuthApiError(error) && (error.code === 'over_request_rate_limit' || error.status === 429)) {
+      throw new AuthError('RATE_LIMITED', 'Too many attempts. Please wait a minute and try again.')
+    }
+    throw new AuthError('UNKNOWN', 'Could not log in. Please try again.')
+  }
+  return loadUser()
 }
 
 export const supabaseAuthService: AuthService = {
-  async sendOtp(phone, purpose) {
-    const { error } = await supabase.auth.signInWithOtp({
-      phone: toE164(phone),
-      options: { shouldCreateUser: purpose === 'register' },
-    })
-    if (error) throw toAuthError(error, 'Could not send the OTP.')
-  },
+  sendOtp: (phone, purpose, captchaToken) => callAccount({ action: 'send-otp', phone, purpose, captcha: captchaToken }),
 
-  async verifyOtp(phone, otp) {
-    const { error } = await supabase.auth.verifyOtp({ phone: toE164(phone), token: otp, type: 'sms' })
-    if (error) {
-      const mapped = toAuthError(error, 'Could not verify the OTP.')
-      // Anything the server rejects here that is not "expired"/"rate limited" means the code was wrong.
-      throw mapped.code === 'UNKNOWN' ? new AuthError('INVALID_OTP', 'Wrong OTP.') : mapped
-    }
-  },
+  checkOtp: (phone, purpose, otp) => callAccount({ action: 'check-otp', phone, purpose, otp }),
 
-  async setPassword(password) {
-    const { error } = await supabase.auth.updateUser({ password })
-    if (error) throw toAuthError(error, 'Could not save the password. Please try again.')
-  },
-
-  async register(role) {
-    const { error } = await supabase.rpc('register_account', { p_role: role })
-    // ALREADY_REGISTERED is fine here: the person proved they own the number, so just log them in.
-    if (error && error.message !== 'ALREADY_REGISTERED') throw new AuthError('UNKNOWN', 'Could not create your account.')
-    const user = await loadUser()
-    if (!user) throw new AuthError('UNKNOWN', 'Could not load your account.')
+  async register(phone, otp, password, role) {
+    await callAccount({ action: 'register', phone, otp, password, role })
+    const user = await signIn(phone, password)
+    if (!user) throw UNKNOWN
     return user
   },
 
-  async signInWithPassword(phone, password) {
-    const { error } = await supabase.auth.signInWithPassword({ phone: toE164(phone), password })
-    if (error) throw toAuthError(error, 'Could not log in. Please try again.')
-    return loadUser()
+  async resetPassword(phone, otp, password) {
+    await callAccount({ action: 'reset-password', phone, otp, password })
+    const user = await signIn(phone, password)
+    if (!user) throw UNKNOWN
+    return user
   },
+
+  signInWithPassword: signIn,
 
   getSession: loadUser,
 

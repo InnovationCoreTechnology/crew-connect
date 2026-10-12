@@ -10,8 +10,8 @@ Owner goals: fast · multi-platform · free to start · can move to paid without
 |---|---|---|---|
 | D1 | Frontend hosting | **Cloudflare**, static assets served from its CDN (Workers Static Assets; Pages is the older product) | Decided |
 | D2 | Backend | **Supabase** (managed PostgreSQL + Auth + Storage + Edge Functions), region **Mumbai `ap-south-1`** | Decided |
-| D3 | SMS OTP provider | **MSG91**, connected through Supabase's *Send SMS hook* | Decided – official MSG91 price **unverified** |
-| D4 | Login method | **Mobile + password**; SMS OTP only to register and to reset a forgotten password | **Revised by the owner 2026-10-11** (was: phone + OTP only) |
+| D3 | SMS OTP provider | **MSG91**, called from our own Edge Function `account-auth` (not from Supabase's phone provider) | Decided – official MSG91 price and API still **unverified**; gateway not connected yet |
+| D4 | Login method | **Mobile + password**; SMS OTP only to register and to reset a forgotten password. No Supabase phone provider: logins are hidden email-style identities + password; the OTP system is our own | **Revised by the owner 2026-10-11, twice** |
 
 ## 2. Why each pick
 
@@ -52,22 +52,22 @@ Honest weaknesses and how we handle them:
 - Database > ~400 MB, storage > ~800 MB, or egress close to 5 GB, or
 - The project pause causes a user-visible outage.
 
-### D3 – MSG91 via Send SMS hook
-- Supabase phone login natively lists MessageBird, Twilio, Vonage and TextLocal (https://supabase.com/docs/guides/auth/phone-login). MSG91 and Fast2SMS are **not** native.
-- Supabase's **Send SMS hook** lets you "use your own SMS service to send authentication messages" via an HTTP endpoint (Edge Function) (https://supabase.com/docs/guides/auth/auth-hooks/send-sms-hook). We write one small Edge Function that calls MSG91's API. The docs' example uses Twilio, so the MSG91 call itself must be written from MSG91's official API docs in Phase 1 (**unverified until then**).
-- **India DLT registration is mandatory** for transactional SMS; Supabase's docs mention TRAI DLT as the example of country rules. Start the DLT registration (entity, sender ID, OTP template) early – it takes days and gates real SMS.
-- **Price:** not verified from MSG91's official rate card. Third-party sources suggest about ₹0.15–0.25 per OTP before GST – treat as a rough guess only; get the real quote from msg91.com/in/pricing before budgeting.
-- Fast2SMS stays as a fallback; the hook design makes switching a one-function change.
+### D3 – MSG91 through our own Edge Function
+- Supabase's phone provider can only be switched on with credentials from one of its listed SMS providers (the dashboard refuses to save the Phone form without Twilio keys), and MSG91 is not one of them. Whether its "Send SMS hook" would avoid that requirement is not stated in the official docs (unverified). So the phone provider is **not used at all**.
+- Instead the Edge Function `account-auth` sends the OTP text through an SMS gateway adapter (`supabase/functions/account-auth/sms.ts`). It is a stub until MSG91's official API docs are read and the owner has an MSG91 account and a DLT-approved OTP template (India: DLT registration is mandatory, takes days).
+- **Price:** not verified from MSG91's official rate card. Third-party sources suggest about Rs 0.15-0.25 per OTP before GST, only a rough guess.
+- Fast2SMS stays a fallback; only `sms.ts` changes.
 
-### D4 – Mobile + password, OTP to register and to reset (revised by the owner, 2026-10-11)
+### D4 – Mobile + password, our own OTP (revised by the owner, 2026-10-11, twice)
 - **What the user does:** new user = role, mobile number, SMS OTP, then creates a password. Returning user = mobile number + password only (no SMS, so no SMS cost per login). Forgot password = mobile number, SMS OTP, new password.
-- **Why it changed:** the owner wants the familiar password flow with a forgot-password path. My first answer (OTP only, no passwords) was a delegated choice and is replaced. With Supabase Auth the passwords are stored hashed by Supabase, not by our code.
-- **How (official APIs):** `signInWithPassword` for login; `signInWithOtp` + `verifyOtp` to prove the number; `updateUser({ password })` to set the password (the library docs say the user must be signed in first, which a correct OTP does). The reset flow is my combination of those documented calls: UNVERIFIED until tried with real SMS.
-- **Verified on the live project (2026-10-11):** with the Phone provider disabled, even password login by phone answers `phone_provider_disabled` ("Phone logins are disabled"). The provider must be enabled in the dashboard even if no SMS is sent.
-- **Password rules:** minimum 8 characters, with a letter and a number (Supabase: "Anything less than 8 characters is not recommended"). The server minimum is set in the dashboard Auth settings and must be the same or lower. Leaked-password protection is Pro-plan only (not used on Free).
-- **Known risk (Supabase docs):** carriers recycle phone numbers, so a new owner of an old number could reach an old account; the documented mitigation is MFA (not built yet; list it for a later phase).
-- **SMS cost:** now only registration and password resets send SMS; normal logins do not. Supabase rate limits and a CAPTCHA decision are still open (roadmap 1.12).
-- Admin accounts: created manually in the database (`supabase/admin/create_admin.sql`), never from the app.
+- **How it works:** a login in Supabase Auth is a hidden email-style identity `<10 digits>@users.crewconnect.invalid` + password (verified 2026-10-11: password login works with no phone provider; Supabase's Admin API accepts that address). The real mobile number and the role live in `profiles`. The OTP is generated in the database (cryptographic randomness), stored only as a bcrypt hash, and checked by database functions that only the server (service role) can call. The Edge Function `account-auth` (`verify_jwt = false`, because it runs before login) validates input and is the only code that creates users (Auth Admin API `createUser`) or changes passwords (`updateUserById`).
+- **Limits enforced in the database (`app_settings`, tested):** 60 s between OTPs for a number; 5 OTPs per number per hour; 20 requests per caller IP per hour (only a sha-256 hash of the IP is stored, deleted after a day); 300 per hour for the whole project; 5 wrong guesses per code; 5-minute expiry; a code can be used once; only the newest code works; a `register` code cannot reset a password. These limits run BEFORE the "already registered / not registered" answer, so they also slow down number probing. OTP rows are deleted after 7 days (`otp_retention_days`), done inside the OTP function because Supabase's cron page does not show the setup SQL (pg_cron not used). Two simultaneous requests for one number are serialised with an advisory lock (not stress-tested).
+- **Dev test numbers:** `private.test_phones` lists 10 fake numbers (9000000001-10) that get the fixed code 123456 and no SMS, but ONLY while `app_settings.dev_mode = 1` (default 0; the dev seed sets it). So a seed run on production by mistake does nothing.
+- **Trade-offs we now own:** OTP security is our code, not a vendor's (mitigated by the tests and limits above; an independent security review of PR #6 found 8 issues, all addressed on 2026-10-12); the email-style identity is a convention (emails are never sent; if the `.invalid` domain is ever rejected by Supabase the convention changes in two places and needs a data migration); the project-wide OTP cap could be exhausted by an attacker, which the CAPTCHA below makes harder.
+- **Passwords:** minimum 8 characters with a letter and a number, maximum 72 (bcrypt); Supabase says anything under 8 is not recommended. Leaked-password protection is a Pro-plan feature (the security advisor warns about it).
+- **CAPTCHA (added 2026-10-12): Cloudflare Turnstile**, free, on Send OTP and Resend OTP only (those cost SMS money and can lock people out). The browser widget (explicit rendering, script loaded from Cloudflare's exact URL as its docs require) yields a one-time token (valid 300 s, usable once); the Edge Function checks it with Cloudflare's Siteverify BEFORE touching the database and fails closed if Cloudflare cannot be reached. Secret `TURNSTILE_SECRET_KEY` lives only in Supabase Edge Function secrets; the site key (public) is `VITE_TURNSTILE_SITE_KEY`. Safety rule in code: no secret configured => only dev test numbers work and a real SMS is never sent. Hostnames are not bound in code: restrict them in the Turnstile widget settings. Cloudflare's published dummy keys are used for tests only.
+- **Known risk (Supabase docs):** carriers recycle phone numbers; MFA is the documented mitigation (not built).
+- Admin accounts are created manually in the database (`supabase/admin/create_admin.sql`), never from the app. After a password reset every old session of that person is ended (access tokens already issued live until they expire, default 1 hour). Existing sessions are not cancelled when a password is reset (open item).
 
 ## 3. Target architecture
 
@@ -77,10 +77,10 @@ Browser / PWA (React, Vite)  ──►  Cloudflare CDN (static, cached, hashed f
         │  supabase-js (HTTPS)
         ▼
 Supabase (Mumbai)
-  ├─ Auth            phone OTP, sessions
+  ├─ Auth            email-style identity + password, sessions
   ├─ Postgres        tables + indexes + RLS + SQL functions (unlock, wallet)
   ├─ Storage         private bucket for ID documents
-  └─ Edge Functions  send-sms hook (MSG91), Razorpay webhook (Phase 3)
+  └─ Edge Functions  account-auth (register, OTP, reset; sends SMS via MSG91 later), Razorpay webhook (Phase 3)
 ```
 
 Rules:
@@ -120,6 +120,7 @@ Rules:
 - Verified facts from the live project: login for an unknown number answers `otp_disabled`; registration answers `phone_provider_disabled` until Phone sign-in is enabled.
 - Supabase phone OTPs are 6 digits and expire in 60 seconds by default (phone-login guide), so the template's 4-digit demo OTP was removed.
 - 2026-10-11: login rework (D4 revised) and a DEV test-data seed with a password per role; see `supabase/seed/dev_seed.sql`.
+- 2026-10-11 (later): the Supabase Phone provider cannot be saved without Twilio-style credentials, so login was redesigned around our own OTP system and an Edge Function (see D3 / D4 above). The Phone provider stays OFF. Every role was tested in a browser against the live project.
 
 ## 8. What happens next
 

@@ -24,6 +24,8 @@ export function validateLoginPassword(value: string): string {
 export function validateNewPassword(password: string, phone: string): string {
   if (!password) return 'Create a password.'
   if (/\s/.test(password)) return 'Password cannot have spaces.'
+  // Supabase hashes passwords with bcrypt, which reads at most 72 BYTES; non-English letters and emoji take several bytes each.
+  if (new TextEncoder().encode(password).length > 72) return 'This password is too long. Use a shorter one (at most 72 bytes; letters in Hindi or Kannada count more).'
   if (password.length < AUTH_CONFIG.minPasswordLength) {
     return `Use at least ${AUTH_CONFIG.minPasswordLength} characters.`
   }
