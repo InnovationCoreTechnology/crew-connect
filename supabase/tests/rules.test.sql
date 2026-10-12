@@ -18,7 +18,7 @@ declare
   v_x     uuid := '00000000-0000-0000-0000-0000000000f1'; -- non-Indian phone
   v_j1    uuid := '00000000-0000-0000-0000-0000000000b1';
   v_j2    uuid := '00000000-0000-0000-0000-0000000000b2';
-  n integer; r record; t text; v_wrong text; k integer;
+  n integer; r record; ov record; t text; v_wrong text; k integer;
   v_raised boolean; v_msg text; v_state text; v_rows integer;
   v_all uuid[] := '{}'; v_cur_at timestamptz; v_cur_id uuid; v_cnt integer; v_iter integer := 0;
 begin
@@ -136,7 +136,7 @@ begin
   exception when others then v_raised := true; v_state := sqlstate; end;
   if not v_raised or v_state <> '42501' then reset role; raise exception 'FAIL: client could insert a profile/role'; end if;
 
-  foreach t in array array['search_candidates()', 'admin_stats()', 'get_my_employer()', 'list_unlocked()'] loop
+  foreach t in array array['search_candidates()', 'admin_stats()', 'admin_overview()', 'get_my_employer()', 'list_unlocked()'] loop
     v_raised := false;
     begin execute format('select * from public.%s', t);
     exception when others then v_raised := true; v_msg := sqlerrm; end;
@@ -160,6 +160,12 @@ begin
   exception when others then v_raised := true; v_state := sqlstate; end;
   reset role;
   if not v_raised or v_state <> '42501' then raise exception 'FAIL: anon can call search_candidates'; end if;
+  set local role anon;
+  v_raised := false;
+  begin perform * from public.admin_overview();
+  exception when others then v_raised := true; v_state := sqlstate; end;
+  reset role;
+  if not v_raised or v_state <> '42501' then raise exception 'FAIL: anon can call admin_overview'; end if;
 
   ------------------------------------------------------------------ owner sets up the rest of the data
   update public.candidates set name = 'Suresh Gowda', type = 'Housekeeping', exp = 1, area = 'HSR Layout', salary = 15000, shift = 'Any' where id = v_c2;
@@ -323,6 +329,12 @@ begin
   exception when others then v_raised := true; v_msg := sqlerrm; end;
   reset role;
   if not v_raised or v_msg <> 'FORBIDDEN' then raise exception 'FAIL: employer could read admin stats'; end if;
+  set local role authenticated;
+  v_raised := false;
+  begin perform * from public.admin_overview();
+  exception when others then v_raised := true; v_msg := sqlerrm; end;
+  reset role;
+  if not v_raised or v_msg <> 'FORBIDDEN' then raise exception 'FAIL: employer could read the admin overview (got %)', coalesce(v_msg, 'no error'); end if;
 
   perform set_config('request.jwt.claims', json_build_object('sub', v_admin, 'role', 'authenticated')::text, true);
   set local role authenticated;
@@ -331,6 +343,34 @@ begin
      or r.jobs_count <> 2 or r.unlocks_count <> 2 or r.revenue_inr <> 30 then
     reset role; raise exception 'FAIL: admin_stats % % % % % %', r.candidates_count, r.employers_count, r.pending_employers_count, r.jobs_count, r.unlocks_count, r.revenue_inr;
   end if;
+  -- admin_overview: employer is refused (the candidate case is in the loop above); totals match the tables; the range works
+  select * into ov from public.admin_overview();
+  reset role;
+  if ov.candidates_total <> (select count(*) from public.candidates)
+     or ov.candidates_visible <> 8
+     or ov.employers_total <> 2 or ov.employers_pending <> 1 or ov.employers_approved <> 1 or ov.employers_blocked <> 0
+     or ov.jobs_total <> 2 or ov.applications_total <> (select count(*) from public.applications)
+     or ov.unlocks_total <> 2 or ov.revenue_total_inr <> 30
+     or ov.candidates_new <> ov.candidates_total or ov.unlocks_new <> 2 or ov.revenue_range_inr <> 30 then
+    raise exception 'FAIL: admin_overview totals % % % % % %', ov.candidates_total, ov.employers_total, ov.jobs_total, ov.applications_total, ov.unlocks_total, ov.revenue_total_inr;
+  end if;
+  set local role authenticated;
+  select * into ov from public.admin_overview(now() + interval '1 day', null); -- a period in the future: nothing is "new", totals stay
+  if ov.candidates_new <> 0 or ov.employers_new <> 0 or ov.jobs_new <> 0 or ov.applications_new <> 0 or ov.unlocks_new <> 0
+     or ov.revenue_range_inr <> 0 or ov.unlocks_total <> 2 or ov.revenue_total_inr <> 30 then
+    reset role; raise exception 'FAIL: admin_overview future range';
+  end if;
+  select * into ov from public.admin_overview(now() - interval '1 day', now() + interval '1 day'); -- everything in the test was created now
+  if ov.unlocks_new <> 2 or ov.revenue_range_inr <> 30 or ov.employers_new <> 2 or ov.jobs_new <> 2 then
+    reset role; raise exception 'FAIL: admin_overview current range';
+  end if;
+  select * into ov from public.admin_overview(null, now() - interval '1 day'); -- before yesterday: nothing was created yet
+  if ov.unlocks_new <> 0 or ov.candidates_new <> 0 then reset role; raise exception 'FAIL: admin_overview past range'; end if;
+  v_raised := false;
+  begin perform * from public.admin_overview(now(), now() - interval '1 day');
+  exception when others then v_raised := true; v_msg := sqlerrm; end;
+  if not v_raised or v_msg <> 'INVALID_RANGE' then reset role; raise exception 'FAIL: reversed range accepted (got %)', coalesce(v_msg, 'no error'); end if;
+
   perform public.admin_set_employer_status(v_e2, 'Approved');
   perform public.admin_set_candidate_flag(v_c2, 'verified', true);
   v_raised := false;

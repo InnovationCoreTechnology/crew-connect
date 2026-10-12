@@ -7,7 +7,7 @@ import { useResource } from '../../shared/hooks/useResource'
 
 const TONE: Record<EmployerStatus, 'ok' | 'warn' | 'bad'> = { Approved: 'ok', Pending: 'warn', Blocked: 'bad' }
 
-export function EmployersTable({ onChanged }: { onChanged: () => void }) {
+export function EmployersTable() {
   const loader = useCallback(() => listEmployers(), [])
   const result = useResource(loader)
   const [busyId, setBusyId] = useState('')
@@ -19,7 +19,6 @@ export function EmployersTable({ onChanged }: { onChanged: () => void }) {
     try {
       await setEmployerStatus(id, status)
       result.reload()
-      onChanged() // refresh the stat cards
     } catch {
       setError('Could not update. Please try again.')
     } finally {
