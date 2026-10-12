@@ -20,6 +20,7 @@ const MESSAGES: Record<string, { code: AuthErrorCode; text: string }> = {
   NOT_REGISTERED: { code: 'NOT_REGISTERED', text: 'This number is not registered.' },
   RATE_LIMITED: { code: 'RATE_LIMITED', text: 'Too many OTP requests. Please wait a minute and try again.' },
   SMS_FAILED: { code: 'SMS_FAILED', text: 'We could not send the SMS right now. Please try again later.' },
+  CAPTCHA_FAILED: { code: 'CAPTCHA_FAILED', text: 'Please complete the security check and try again.' },
   INVALID_OTP: { code: 'INVALID_OTP', text: 'Wrong OTP.' },
   OTP_EXPIRED: { code: 'OTP_EXPIRED', text: 'This OTP has expired. Please request a new one.' },
   TOO_MANY_ATTEMPTS: { code: 'TOO_MANY_ATTEMPTS', text: 'Too many wrong attempts. Please request a new OTP.' },
@@ -67,7 +68,7 @@ async function signIn(phone: string, password: string): Promise<User | null> {
 }
 
 export const supabaseAuthService: AuthService = {
-  sendOtp: (phone, purpose) => callAccount({ action: 'send-otp', phone, purpose }),
+  sendOtp: (phone, purpose, captchaToken) => callAccount({ action: 'send-otp', phone, purpose, captcha: captchaToken }),
 
   checkOtp: (phone, purpose, otp) => callAccount({ action: 'check-otp', phone, purpose, otp }),
 

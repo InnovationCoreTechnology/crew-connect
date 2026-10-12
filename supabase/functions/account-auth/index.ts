@@ -17,11 +17,12 @@
 import { createClient } from 'npm:@supabase/supabase-js@2.117.3'
 import { corsHeaders } from 'npm:@supabase/supabase-js@2.117.3/cors'
 import { sendSms, smsConfigured } from './sms.ts'
+import { verifyTurnstile } from './turnstile.ts'
 
 type Purpose = 'register' | 'reset'
 type Code =
   | 'INVALID_INPUT' | 'ALREADY_REGISTERED' | 'NOT_REGISTERED' | 'RATE_LIMITED' | 'SMS_FAILED'
-  | 'INVALID_OTP' | 'OTP_EXPIRED' | 'TOO_MANY_ATTEMPTS' | 'WEAK_PASSWORD' | 'SAME_PASSWORD' | 'UNKNOWN'
+  | 'INVALID_OTP' | 'OTP_EXPIRED' | 'TOO_MANY_ATTEMPTS' | 'WEAK_PASSWORD' | 'SAME_PASSWORD' | 'CAPTCHA_FAILED' | 'UNKNOWN'
 
 const PHONE = /^[6-9]\d{9}$/
 const OTP = /^\d{6}$/
@@ -76,7 +77,7 @@ Deno.serve(async (req) => {
   try {
     const db = adminClient()
 
-    /* ---------- send-otp: { phone, purpose } ---------- */
+    /* ---------- send-otp: { phone, purpose, captcha } ---------- */
     if (body.action === 'send-otp') {
       const purpose = body.purpose
       if (purpose !== 'register' && purpose !== 'reset') return fail('INVALID_INPUT')
@@ -85,6 +86,18 @@ Deno.serve(async (req) => {
       if (isTest.error) return fail('UNKNOWN')
       // No SMS gateway yet: refuse real numbers BEFORE a code is issued, so they do not burn their rate limit for nothing.
       if (!isTest.data && !smsConfigured()) return fail('SMS_FAILED')
+
+      // CAPTCHA (Cloudflare Turnstile): protects the SMS bill and stops people locking others out of registering.
+      // Secret = Supabase dashboard -> Edge Functions -> Secrets -> TURNSTILE_SECRET_KEY (never in the repo).
+      //  * secret set      -> EVERY OTP request needs a valid token (checked BEFORE any database work)
+      //  * secret not set  -> only the dev test numbers work, and a REAL SMS is never sent (the line below)
+      const turnstileSecret = Deno.env.get('TURNSTILE_SECRET_KEY')
+      if (!turnstileSecret && !isTest.data) return fail('SMS_FAILED')
+      if (turnstileSecret) {
+        const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || null
+        const human = await verifyTurnstile(turnstileSecret, body.captcha, ip)
+        if (!human.ok) return fail('CAPTCHA_FAILED')
+      }
 
       const issued = await db.rpc('auth_otp_issue', { p_phone: phone, p_purpose: purpose as Purpose })
       if (issued.error) return fail(fromDb(issued.error.message))

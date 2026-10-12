@@ -19,3 +19,5 @@
 .rs{margin:8px 0 0;font-size:13px;color:var(--muted);display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
 .rs .linkb{font-size:13px}
 @media (max-width:760px){.lw{grid-template-columns:1fr;gap:20px}.lc{justify-self:center}.pts{display:none}.deco{font-size:90px}}
+
+.captcha{margin:10px 0 4px;min-height:0}

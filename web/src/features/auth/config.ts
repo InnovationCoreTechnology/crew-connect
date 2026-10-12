@@ -11,5 +11,8 @@ export const AUTH_CONFIG = {
   // Supabase's own guidance: "Anything less than 8 characters is not recommended" (https://supabase.com/docs/guides/auth/password-security).
   // The project's server-side minimum (dashboard -> Authentication) must be the same or lower, or Supabase answers `weak_password`.
   minPasswordLength: 8,
+  // Cloudflare Turnstile site key (public). Empty = no widget is shown and no token is sent (dev only: the server then accepts only
+  // the dev test numbers). Create the real widget in the Cloudflare dashboard; it needs the hostnames the site is served from.
+  turnstileSiteKey: import.meta.env.VITE_TURNSTILE_SITE_KEY ?? '',
   resendSeconds: 60, // same as app_settings.otp_resend_seconds in the database (the database is what enforces it)
 } as const
