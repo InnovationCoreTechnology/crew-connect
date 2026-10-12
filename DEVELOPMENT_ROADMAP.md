@@ -229,7 +229,7 @@ Why: today employers cannot post jobs, so the candidate side has nothing to appl
 - [ ] 4.1 Employer job posting: create / edit / close job, multiple openings
 - [ ] 4.2 Employer company profile: company name, address, GST (collected at first login – currently blank)
 - [ ] 4.3 Applicant pipeline per job: Applied → Shortlisted → Interview → Hired / Rejected
-- [ ] 4.4 Candidate sees status changes in "My applications"
+- [ ] 4.4 Candidate sees status changes in "My applications" — PART DONE 2026-10-12: the screen itself (cards, summary, filter chips, tracker; owner-approved mockup). Still open: statuses beyond Applied / Shortlisted / Rejected (needs 4.3) and a notification when the status changes
 - [ ] 4.5 Pagination + server-side filtering for candidates and jobs — candidates and unlocked lists are DONE in Phase 1 (keyset paging + Load more); jobs (capped at 100) and admin lists (capped at 500) remain
 - [ ] 4.6 Admin-controlled lists (job categories + designations, cities + areas, business numbers, reasons) instead of hard-coded lists in `config.ts` and CHECK constraints. DESIGN written 2026-10-12: [docs/ADMIN_CONTROLLED_LISTS.md](docs/ADMIN_CONTROLLED_LISTS.md); build order there (DB -> admin Lists tab -> candidate/job/search screens -> areas -> numbers/reasons -> cleanup). **Blocked on D12-D17**
 - [ ] 4.7 Job expiry and "filled" state
@@ -305,3 +305,4 @@ Why: product is only proven by real usage.
 | 2026-10-12 | Saved candidate profile view (card + profile strength + Edit) | `feat/candidate-profile-view` into `develop` | see git log | `git revert -m 1 <merge>` |
 | 2026-10-12 | Release v0.1.0 (first release: develop -> main via PR #9; tag on `4464f5f`; the release template was NOT used for this first one) | `develop` into `main` | 4464f5f | Cloudflare: redeploy previous deployment; git: `git revert -m 1 4464f5f` on a `hotfix/*` branch |
 | 2026-10-12 | Design for admin-controlled lists (4.6), decisions D12-D17 opened | `docs/admin-controlled-lists` into `develop` | see git log | `git revert -m 1 <merge>` |
+| 2026-10-12 | Improved My applications screen (4.4 part) | `feat/applications-view` into `develop` | see git log | `git revert -m 1 <merge>` |

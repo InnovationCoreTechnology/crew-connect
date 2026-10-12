@@ -1,4 +1,4 @@
-import type { CandidateProfile, Employer } from './types'
+import type { ApplicationStatus, ApplicationView, CandidateProfile, Employer } from './types'
 
 // Business rules in plain functions, so they are easy to find, test and change.
 // IMPORTANT: these only decide what the SCREEN shows. The same rules are enforced again in the database
@@ -27,4 +27,28 @@ export function profileStrength(c: Pick<CandidateProfile, 'name' | 'verified'>):
   ]
   const percent = (steps[0].done ? 60 : 0) + (steps[1].done ? 40 : 0)
   return { percent, steps }
+}
+
+// What the candidate reads for an application. The database stores Applied / Shortlisted / Rejected; the screen says
+// "In review" and "Not selected" because "Applied" does not tell the candidate what is happening and "Rejected" is harsh.
+export const APPLICATION_LABEL: Record<ApplicationStatus, string> = { Applied: 'In review', Shortlisted: 'Shortlisted', Rejected: 'Not selected' }
+export const APPLICATION_ORDER: readonly ApplicationStatus[] = ['Applied', 'Shortlisted', 'Rejected']
+
+// One pass over the list (O(n)) for the summary tiles and filter chips.
+export function countApplications(apps: readonly Pick<ApplicationView, 'status'>[]): Record<ApplicationStatus, number> {
+  const counts: Record<ApplicationStatus, number> = { Applied: 0, Shortlisted: 0, Rejected: 0 }
+  for (const a of apps) counts[a.status] += 1
+  return counts
+}
+
+// Steps of the progress tracker. Interview and Hired cannot happen yet (no employer pipeline until roadmap 4.3),
+// so they are always shown as "not reached". A rejected application has no tracker.
+export interface TrackerStep { label: string; reached: boolean }
+export function applicationSteps(status: Exclude<ApplicationStatus, 'Rejected'>): TrackerStep[] {
+  return [
+    { label: 'Applied', reached: true },
+    { label: 'Shortlisted', reached: status === 'Shortlisted' },
+    { label: 'Interview', reached: false },
+    { label: 'Hired', reached: false },
+  ]
 }

@@ -38,7 +38,7 @@ export function CandidateDashboard() {
           />
           {tab === 'profile' && <ProfileTab key={profile.id} profile={profile} onSaved={profileRes.reload} />}
           {tab === 'jobs' && <JobsTab profile={profile} onGoToProfile={() => setTab('profile')} />}
-          {tab === 'apps' && <ApplicationsTab />}
+          {tab === 'apps' && <ApplicationsTab onFindJobs={() => setTab('jobs')} />}
         </>
       )}
     </DashboardShell>
