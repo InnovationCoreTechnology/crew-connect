@@ -166,6 +166,15 @@ Append-only history of what was built, why, and how to undo it. Newest entry at 
 - Rollback: `git revert -m 1 <merge>`; the `develop` branch can stay (it equals `main` until the first change).
 - Needs owner: choose whether GitHub's default branch becomes `develop` (so new PRs target it by default); in Cloudflare Workers Builds set production branch `main` when connecting GitHub.
 
+### 2026-10-12 · Saved candidate profile view
+- Branch / commit: `feat/candidate-profile-view` (from `develop`).
+- Why: after pressing Save the candidate saw the same form again; the owner asked for a finished-profile view like job sites show (mockup option A approved).
+- What changed: new `ProfileTab` (first-time candidate with no name sees the form; otherwise the view), `ProfileView` (avatar initial, name, job type + area, ID badge, "Visible to employers", fact tiles, profile-strength meter with checklist, Edit profile), `ProfileForm` gets Cancel when editing an existing profile, `profileStrength()` in `data/rules.ts` (basic details 60 + verified ID 40), styles in `dashboard.css`. No database, API or dependency change.
+- Verification: `npm run lint` clean; `npm run build` clean (first-load 144.17 KB gzip, unchanged; candidate chunk 3.19 KB gzip).
+- NOT verified: the screen in a browser (login goes to the remote Supabase project; I do not enter credentials there). Owner to check: new candidate sees the form and, after Save, the card; Edit profile and Cancel work; the strength shows 60% (unverified) or 100% (verified). No unit test: Vitest arrives with roadmap 2.4.
+- Not built (needs new fields, separate task): photo, languages, skills, about-me. The ID step says "earns the trust badge"; there is no candidate-side ID submission yet (roadmap Phase 5).
+- Rollback: `git revert -m 1 <merge>`.
+
 ### 2026-10-12 · Release v0.1.0 (first production merge)
 - What: PR #9 merged `develop` into `main` (merge `4464f5f`); `main` and `develop` have identical content. Annotated tag `v0.1.0` created on that merge by the owner.
 - Not done: the release PR template was not used and the sign-off line was not filled for this first release; the live site was not redeployed (still the manual 2026-10-11 deploy); SQL rule tests were last passed on 2026-10-12 (PR #6 fixes), no database change since.

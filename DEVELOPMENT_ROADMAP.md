@@ -204,6 +204,7 @@ Why: deploy early and often so every later phase is tested in real conditions, a
 - [ ] 2.11 Before a second developer joins: GitHub Pro (or org plan) and branch protection / rulesets on `main` and `develop` (require PR, require the CI check, 1 Code Owner approval, no force-push/delete). Price -> Cost tracker, owner approves first
 - [ ] 2.12 Before real users: separate production Supabase project + a staging address for `develop` (Cloudflare Workers Builds: production branch `main`, `develop` builds get preview URLs); `main` deploys to production only
 - [x] 2.13 Branching model main/develop, CI workflow, PR + release templates, CODEOWNERS, `docs/RELEASE_PROCESS.md` (2026-10-12; the CI check's first real run is on the PR of this task)
+- [x] 4.x Saved candidate profile view with strength meter (owner-approved mockup option A; 2026-10-12). Photo, languages, skills and about-me are NOT built: they need new fields (migration + rollback + privacy review) and stay open
 **Exit check:** merging to `main` auto-deploys; a deliberate bad deploy was rolled back successfully in under 2 minutes.
 
 ### Phase 3 – Payments & wallet  *(branch: `phase/3-payments`)*
@@ -295,4 +296,5 @@ Why: product is only proven by real usage.
 | 2026-10-12 | PR #6 review: 8 findings fixed (orphan login recovery, number-probing limits + per-IP limit, dev_mode switch, OTP retention, consume check, advisory lock, 72 BYTES, sessions ended after reset) | `fix/pr6-review` into `phase/1b-password-login` | see git log | `git revert -m 1 <merge>`; database `supabase/rollback/20261012100000_otp_review_fixes.down.sql`; Edge Function: redeploy version 3 |
 | 2026-10-12 | CAPTCHA now runs ON DEMAND (only when Send / Resend OTP is pressed) | `fix/captcha-on-demand` | see git log | `git revert -m 1 <merge>` |
 | 2026-10-12 | 2.13 Branching model main/develop, CI, PR/release templates, CODEOWNERS, release process | `docs/branching-strategy` into `develop` | see git log | `git revert -m 1 <merge>` |
+| 2026-10-12 | Saved candidate profile view (card + profile strength + Edit) | `feat/candidate-profile-view` into `develop` | see git log | `git revert -m 1 <merge>` |
 | 2026-10-12 | Release v0.1.0 (first release: develop -> main via PR #9; tag on `4464f5f`; the release template was NOT used for this first one) | `develop` into `main` | 4464f5f | Cloudflare: redeploy previous deployment; git: `git revert -m 1 4464f5f` on a `hotfix/*` branch |

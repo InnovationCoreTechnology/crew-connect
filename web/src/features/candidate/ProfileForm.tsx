@@ -9,7 +9,8 @@ import { validateExperience, validateName, validateSalary } from './profileValid
 
 interface Errors { name?: string; exp?: string; salary?: string; form?: string }
 
-export function ProfileForm({ profile, onSaved }: { profile: CandidateProfile; onSaved: () => void }) {
+// onCancel is given only when the candidate already has a saved profile (they came here with Edit profile).
+export function ProfileForm({ profile, onSaved, onCancel }: { profile: CandidateProfile; onSaved: () => void; onCancel?: () => void }) {
   const [name, setName] = useState(profile.name)
   const [type, setType] = useState<JobType>(profile.type)
   const [exp, setExp] = useState(String(profile.exp))
@@ -68,7 +69,10 @@ export function ProfileForm({ profile, onSaved }: { profile: CandidateProfile; o
       </p>
       {/* TODO (Verification): add resume / ID photo upload (Supabase Storage). Do NOT store Aadhaar numbers. */}
       {errors.form && <p className="ferr" role="alert">{errors.form}</p>}
-      <button type="button" className="btn big" disabled={busy} onClick={save}>{busy ? 'Saving…' : 'Save profile'}</button>
+      <div className="actions">
+        <button type="button" className="btn big" disabled={busy} onClick={save}>{busy ? 'Saving…' : 'Save profile'}</button>
+        {onCancel && <button type="button" className="btn ghost big" disabled={busy} onClick={onCancel}>Cancel</button>}
+      </div>
       {saved && <p className="saved" role="status">Profile saved ✔</p>}
     </div>
   )
