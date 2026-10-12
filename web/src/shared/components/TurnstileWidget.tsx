@@ -1,12 +1,12 @@
 import { useEffect, useImperativeHandle, useRef, useState, type Ref } from 'react'
 
-// Cloudflare Turnstile ("I am not a robot" check), run ON DEMAND: nothing happens when the form appears. The check starts only
-// when the caller asks for a token (the user pressed "Send OTP"), so switching tabs or an empty form never starts a challenge.
+// Cloudflare Turnstile, run ON DEMAND: nothing happens when the form appears. The check starts only when the caller asks for
+// a token (the user ticked our "I'm not a robot" box, see HumanCheck), so switching tabs or an empty form never starts a challenge.
 // The token is valid 300 s and usable ONCE, and the SERVER must verify it (supabase/functions/account-auth/turnstile.ts):
 // the widget alone protects nothing. Cloudflare decides whether a visitor sees a checkbox or just "Success!".
 // Docs (official, checked 2026-10-12):
 //   https://developers.cloudflare.com/turnstile/get-started/client-side-rendering/
-//   https://developers.cloudflare.com/turnstile/get-started/client-side-rendering/widget-configurations/  (execution / appearance = 'execute')
+//   https://developers.cloudflare.com/turnstile/get-started/client-side-rendering/widget-configurations/  (execution = 'execute', appearance = 'interaction-only')
 
 interface TurnstileApi {
   render(container: HTMLElement, options: {
@@ -82,7 +82,7 @@ export function TurnstileWidget({ siteKey, ref }: Props) {
           sitekey: siteKey,
           theme: 'auto',
           execution: 'execute', // do NOT start by itself
-          appearance: 'execute', // stay hidden until the check starts
+          appearance: 'interaction-only', // visible only when Cloudflare really needs the visitor to do something
           callback: (token) => settle({ token }),
           'error-callback': () => settle({ error: new Error('Turnstile error') }),
         })
