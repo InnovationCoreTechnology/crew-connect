@@ -1,0 +1,54 @@
+# Automatic checks on every pull request into `develop` or `main`, and on every push to `develop`.
+# WHY: only tested code may move towards production. This is the automated half of the gate (the manual half is
+# docs/RELEASE_PROCESS.md). A red check means "do not merge".
+# WHAT IT CANNOT DO YET: GitHub cannot BLOCK a merge on a red check for this private repo on the free plan (branch protection
+# needs GitHub Pro). Until then the rule is a team rule: never merge a red PR. The database rule tests (supabase/tests/rules.test.sql)
+# need the Supabase project, so they are run by hand and recorded in the release PR.
+# Versions are pinned exactly (checked 2026-10-12: actions/checkout v7.0.1, actions/setup-node v7.1.0).
+name: CI
+
+on:
+  pull_request:
+    branches: [develop, main]
+  push:
+    branches: [develop]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  web:
+    name: lint, types, build, tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7.0.1
+
+      - uses: actions/setup-node@v7.1.0
+        with:
+          node-version-file: web/.node-version # Node 22, the same as local development and the Cloudflare build
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install (exact versions from package-lock.json)
+        run: npm ci
+        working-directory: web
+
+      - name: Lint
+        run: npm run lint
+        working-directory: web
+
+      - name: Type check and production build
+        run: npm run build # runs tsc -b && vite build
+        working-directory: web
+
+      - name: Known vulnerabilities in runtime dependencies (high or worse fails the check)
+        run: npm audit --omit=dev --audit-level=high
+        working-directory: web
+
+      - name: CAPTCHA verification tests (Cloudflare's published dummy keys, needs internet)
+        run: node supabase/tests/turnstile.test.mjs
