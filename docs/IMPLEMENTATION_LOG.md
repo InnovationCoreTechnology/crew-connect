@@ -195,3 +195,12 @@ Append-only history of what was built, why, and how to undo it. Newest entry at 
 - Source (official, checked 2026-10-12): https://developers.cloudflare.com/workers/previews/configuration/ ("The `previews` block is required, but it can be empty if your Preview does not need separate settings").
 - Verification: `npm run build` clean; `npx wrangler deploy --dry-run` accepts the config and reads the same 13 asset files. NOT verified: that the next Cloudflare branch build succeeds (it runs on the PR); the docs do not state directly that the empty block leaves `wrangler deploy` unchanged, the dry run shows no change.
 - Cost impact: none. Rollback: `git revert -m 1 <merge>`.
+
+### 2026-10-12 · My applications screen (roadmap 4.4, part)
+- Branch: `feat/applications-view` (from `develop`).
+- Why: the owner found the plain table too thin and asked for a job-site style screen (mockup approved).
+- What changed: `ApplicationsTab` is now summary tiles + filter chips (All / In review / Shortlisted / Not selected) + one card per application (title, company, area, salary, shift, openings, "applied N days ago") + a progress tracker (Applied, Shortlisted, Interview, Hired) + friendly empty and "no applications in this group" states; "Find jobs" / "Find similar jobs" buttons switch to the Find jobs tab. `ApplicationView` gets `appliedAt` (the RPC `list_my_applications` already returned `applied_at`; the screen simply had dropped it). Wording and tracker rules in `data/rules.ts` (Applied is shown as "In review", Rejected as "Not selected"); `timeAgo()` in `shared/format.ts`.
+- No database, RPC or dependency change.
+- Verification: `npm run lint` clean; `npm run build` clean (first load 144.18 KB gzip; candidate chunk 3.69 KB gzip); `timeAgo` checked with a small script (today, yesterday, 5 days, 2 weeks, 8 weeks, dated, invalid input gives an empty string).
+- NOT verified: the screen in a browser (login goes to the remote Supabase project; the Cloudflare preview of this PR can be used). Interview and Hired steps are always "not reached": no employer pipeline exists yet (roadmap 4.3), so the screen cannot show them honestly any other way. The shortlisted line says "may contact you", which is true only if the employer unlocks the number. No unit tests: Vitest arrives with roadmap 2.4.
+- Cost impact: none. Rollback: `git revert -m 1 <merge>`.
