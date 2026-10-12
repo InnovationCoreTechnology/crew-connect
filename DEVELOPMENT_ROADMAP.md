@@ -163,11 +163,13 @@ main                  <- production; only tested, owner-approved releases; every
 - [ ] D18. Visitors: unique visitors, page views, or both? Is a link to Cloudflare's own analytics acceptable if our dashboard cannot read it? (recommended: link first)
 - [ ] D19. Show "Revenue (demo credits)" before real payments, or hide revenue and net until Phase 3? (recommended: show, clearly labelled)
 - [ ] D20. Admin MFA before real users, and how many admins / who? (recommended: yes)
-- [ ] D21. Admin may create candidates and employers, or employers only? Activate when the person sets a password by OTP? (recommended: both, activate by OTP)
+- [x] D21. ANSWERED 2026-10-12 (owner): the admin does NOT create candidates or employers (they self-register). The admin CAN add another admin and CAN hard delete a user or employer (safeguards in docs/ADMIN_DASHBOARD.md section 5)
 - [ ] D22. May the admin change a user's phone number or role? (recommended: no in v1)
 - [ ] D23. What must an employer submit before approval (company name only today; GST, address, ID?) and must a rejection give a reason?
 - [ ] D24. Cost per SMS (from your MSG91 rate card) and which other costs count (recommended: SMS and payment fees automatic, fixed costs entered by hand)
 - [ ] D25. IST and Indian digit grouping for all dashboard numbers (recommended: yes)
+- [ ] D26. Hard delete: instant or 7-day "scheduled" delete (recommended 7 days)? Employers with wallet ledger rows: erase to an anonymous stub (recommended) or refuse? Audit row retention? Backup required before the first real delete?
+- [ ] D27. Only the main admin (owner) deletes admins, any admin may add up to a limit (recommended), or every admin may do both?
 
 ---
 
@@ -241,7 +243,7 @@ Why: today employers cannot post jobs, so the candidate side has nothing to appl
 - [ ] 4.5 Pagination + server-side filtering for candidates and jobs — candidates and unlocked lists are DONE in Phase 1 (keyset paging + Load more); jobs (capped at 100) and admin lists (capped at 500) remain
 - [ ] 4.6 Admin-controlled lists (job categories + designations, cities + areas, business numbers, reasons) instead of hard-coded lists in `config.ts` and CHECK constraints. DESIGN written 2026-10-12: [docs/ADMIN_CONTROLLED_LISTS.md](docs/ADMIN_CONTROLLED_LISTS.md); build order there (DB -> admin Lists tab -> candidate/job/search screens -> areas -> numbers/reasons -> cleanup). **Blocked on D12-D17**
 - [ ] 4.7 Job expiry and "filled" state
-- [ ] 4.8 Admin dashboard v2 (design: [docs/ADMIN_DASHBOARD.md](docs/ADMIN_DASHBOARD.md), written 2026-10-12): Overview tiles with date range, Approvals queue, Users (add / edit / block with audit log), Master data (= 4.6), Money tab. Build order is in the doc; the visitors tile waits for 2.6, the SMS cost tile for 1.8 plus an SMS counter, revenue and net for Phase 3. **Blocked on D12-D25**
+- [ ] 4.8 Admin dashboard v2 (design: [docs/ADMIN_DASHBOARD.md](docs/ADMIN_DASHBOARD.md), written 2026-10-12): Overview tiles with date range, Approvals queue, Users (add admin / edit / block / hard delete, all with audit log), Master data (= 4.6), Money tab. Build order is in the doc; the visitors tile waits for 2.6, the SMS cost tile for 1.8 plus an SMS counter, revenue and net for Phase 3. **Blocked on D12-D27**
 - [ ] 4.9 Audit table for admin actions (shared with 4.6 and 5.6)
 **Exit check:** full loop works with real accounts: post job → candidate applies → employer shortlists → candidate sees it.
 

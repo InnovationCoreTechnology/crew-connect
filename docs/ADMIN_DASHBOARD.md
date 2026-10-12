@@ -19,7 +19,7 @@ Related: [ADMIN_CONTROLLED_LISTS.md](ADMIN_CONTROLLED_LISTS.md) (the master data
 | Companies, candidates, jobs, applications, unlocks (counts) | **Yes, live** | Extend `admin_stats` |
 | Approvals queue (new companies) | **Yes** | One combined list |
 | Approvals queue (ID checks, wrong-number reports) | **No** | Phase 5.2 (ID verification) and 3.5 (wrong-number reports) |
-| Users: add, edit, block / unblock | Block / unblock **yes**; add and edit **no** | New audited admin functions (section 5) |
+| Users: add admin, edit, block / unblock, hard delete | Block / unblock **yes**; the rest **no** | New audited admin functions (section 5) |
 | Master data (job category, designation, areas) | **No** | [ADMIN_CONTROLLED_LISTS.md](ADMIN_CONTROLLED_LISTS.md) |
 | **Visitors** (how many people visited) | **No** | Web analytics (roadmap 2.6). Candidate tool: Cloudflare Web Analytics, described by Cloudflare as "privacy-first analytics ... without changing DNS or using Cloudflare proxy" (https://developers.cloudflare.com/web-analytics/, checked 2026-10-12). **UNVERIFIED:** price, cookie use, setup for a Workers site, and whether the numbers can be read by our own dashboard (API). To verify from Cloudflare's official docs when 2.6 starts. If it has no read API, the admin sees a link to Cloudflare's own dashboard instead of a tile. |
 | **Revenue** (total money earned) | Only internal credits | Real payments: Razorpay (Phase 3.2 to 3.4). Until then the tile stays labelled "Revenue (demo credits)". |
@@ -48,17 +48,26 @@ Every screen has loading, empty and error states, keyboard access, and works on 
 - **SMS log:** record each OTP request (time, purpose, success or failure, no message text and no OTP) so the message count does not depend on MSG91's reports. Today `otp_codes` rows are purged after 7 days, so a separate tiny counter table is needed for long-range totals.
 - **Visitors:** read from the analytics tool if it offers an API, or link out. No personal data is stored by us for this.
 
-## 5. Add and modify users (the sensitive part)
+## 5. Users: admins, edit and hard delete (the sensitive part)
 
-An admin who can create or change accounts can take over accounts, so this is built conservatively:
+Owner decision 2026-10-12 (replaces my earlier "admin creates candidates and employers"): **the admin does not create candidates or employers; they register themselves** with their own OTP. The admin **can add another admin** (to help monitor) and can **hard delete** a candidate or an employer from the database.
 
-- All writes go through **server functions** that check the caller is an admin, validate input, and write an **audit row** (who, what, old value, new value, when). Direct table writes stay impossible.
-- **Add user:** the admin enters name, role (candidate or employer) and a verified mobile number; the account is created without a password, and the person sets a password through the existing OTP "forgot password" flow. The admin never sees or sets a password.
-- **Edit:** profile details (name, job category, designation, area, salary, shift, company name). **Phone number and role are not editable** in the first version (account takeover risk); changing them is a separate decision (D22).
-- **Block / unblock, approve / reject:** already exist for part of the data; add the reason and the audit row.
-- **Creating admins** stays a manual database step (`supabase/admin/create_admin.sql`), never a screen.
+An admin who can create admins, change accounts or erase them is the most powerful role in the system, so this is built conservatively:
+
+- All writes go through **server functions** that check the caller is an admin, validate input, and write an **audit row** (see "Audit and privacy" below). Direct table writes stay impossible.
+- **Add admin:** the admin enters the new admin's name and verified mobile number; the account is created with the admin role and **no password**, and the person sets a password through the OTP flow. The creating admin never sees or sets a password. Rules: the number must not already belong to a candidate or employer (one login = one role); a limit on the number of admins (setting, suggested 5); every addition is audited; recommended: it needs a recent re-login and, once available, MFA (D20). This replaces the earlier rule that admins can only be made by hand in the database (`supabase/admin/create_admin.sql` stays as the emergency route).
+- **Edit:** profile details only (name, job category, designation, area, salary, shift, company name). **Phone number and role are not editable** in version 1 (account takeover risk, D22).
+- **Block / unblock, approve / reject:** with a reason and an audit row.
+- **Hard delete** (candidate or employer): permanently removes the account and its data. Safeguards:
+  - The admin types the person's phone (or the company name) to confirm, and sees what will go: profile, applications, unlocks, login. **It cannot be undone**; the only way back is a database backup restore (so backups must exist before real users, roadmap 2.10).
+  - **Candidate:** the login, profile, applications and unlock records are removed. Wallet ledger rows that mention the candidate keep their money amount but lose the link to the person (the database already sets that link to empty on delete).
+  - **Employer:** **the database refuses the delete today for any employer that has wallet ledger rows**, because the ledger is append-only and its employer link is "restrict" (money records must not vanish). Options are in D26. An employer without ledger rows can be deleted.
+  - An admin **cannot delete themselves** and **cannot delete the last admin**. Deleting **another admin** needs the same typed confirmation and is audited. Who may delete admins is D27.
+  - Implementation note: the login lives in Supabase Auth, so deleting uses Auth's admin API from our Edge Function (service key only on the server), then the database cascades remove the profile rows. The order and failure handling (what if the login is deleted but the rows fail) must be designed and tested in the build task, with the same orphan-recovery care as the registration flow. This is a plan, not tested.
+  - Optional safety net (D26): a "scheduled for deletion" state for 7 days before the real delete, which the admin can cancel. Recommended for candidates and employers unless the owner wants instant deletion.
+- **Audit and privacy:** the audit table records admin id, action, target id and time. It must **not** keep the deleted person's phone number or name after a hard delete (privacy), only the target id and a type. Retention of audit rows is part of D26.
 - **Phone numbers** of candidates are visible to admins only, and viewing them is logged.
-- Each of these has SQL tests (admin can, others cannot; audit row written; invalid input refused) before it ships.
+- Each of these has SQL tests (admin can, others cannot; audit row written; invalid input refused; cannot delete self or the last admin; the employer-with-ledger rule) before it ships.
 
 ## 6. Build order (each a task branch from `develop`, one PR each; DB tasks follow `docs/RELEASE_PROCESS.md`)
 
@@ -66,7 +75,7 @@ An admin who can create or change accounts can take over accounts, so this is bu
 2. **Audit table** (shared with the lists design and roadmap 5.6).
 3. **Approvals queue** (companies), with reasons.
 4. **Master data** (ADMIN_CONTROLLED_LISTS.md steps 1 to 4).
-5. **Users tab**: search, details, add, edit, block (needs decisions D21, D22).
+5. **Users tab**: search, details, add admin, edit, block, hard delete (needs decisions D22, D26, D27; plus D20 for admin MFA).
 6. **Visitors tile** after analytics (2.6).
 7. **SMS cost tile** after the gateway (1.8) and the SMS counter.
 8. **Money tab and revenue / net** after payments (Phase 3).
@@ -75,7 +84,8 @@ An admin who can create or change accounts can take over accounts, so this is bu
 
 | Risk | Handling |
 |---|---|
-| Admin account stolen = whole system exposed | Phone + password only today; recommend admin MFA before real users (D20); audit log; very few admins |
+| Admin account stolen = whole system exposed (it could add admins and delete users) | Phone + password only today; recommend admin MFA before real users (D20); admin limit; audit log; typed confirmations; delete delay (D26) |
+| Hard delete is permanent | Typed confirmation, optional 7-day delay, backups before launch, cannot delete self or the last admin |
 | Admin changes data by mistake | Reasons required, audit log, soft deactivate, confirmations with counts |
 | Cost or revenue numbers mislead | Labels say demo / estimate; costs come from a stored rate the owner confirms |
 | Slow dashboard with growth | Aggregate in the database, indexes, date ranges, daily summary table if measured slow |
@@ -91,8 +101,10 @@ Free for the screens (Postgres only). Analytics: planned as a free tool (to veri
 - **D18. Visitors:** which count do you want: unique visitors, page views, or both? Is a link to Cloudflare's own analytics dashboard acceptable if our dashboard cannot read the numbers? (Recommended: link first.)
 - **D19. Revenue before real payments:** show "Revenue (demo credits)" until Phase 3, or hide revenue and net until then? (Recommended: show, clearly labelled.)
 - **D20. Admin sign-in security:** require a second step (MFA) for admins before real users? How many admins will there be, and who? (Recommended: yes, MFA before launch.)
-- **D21. Add user:** may the admin create **candidates and employers**, or employers only? Must the person's mobile be verified by OTP before the account is active? (Recommended: both roles, activate when the person sets the password through OTP.)
+- **D21. ANSWERED 2026-10-12 by the owner:** the admin does **not** create candidates or employers (they self-register). The admin **can add another admin**, and can **hard delete** a user or employer. Details and safeguards in section 5.
 - **D22. Edit rules:** may the admin change a user's **phone number or role**? (Recommended: no in version 1; do it as a separate, extra-careful task.)
 - **D23. Approvals:** what must an employer submit before approval (company name only today; GST, address, ID?), and does a rejection need a reason shown to the employer? (Ties to roadmap 4.2.)
 - **D24. SMS cost:** will you give the cost per SMS (from your MSG91 rate card) so the dashboard can estimate cost? Do we also count other paid services (Supabase plan, domain) in "cost", or SMS and payment fees only? (Recommended: SMS and payment fees automatic; other fixed costs entered by hand monthly.)
 - **D25. Date and money format:** India time (IST) and ₹ with Indian digit grouping for all dashboard numbers. (Recommended: yes.)
+- **D26. Hard delete rules:** (a) instant, or "scheduled for deletion" for 7 days that the admin can cancel (recommended: 7 days)? (b) **Employers with money records:** erase them to an anonymous stub (name and phone erased, id and ledger kept) and call it deleted (recommended), or refuse to delete them? (c) How long are audit rows kept (suggested: 2 years)? (d) Must a backup exist before the first real delete (recommended: yes, roadmap 2.10)?
+- **D27. Admins and admins:** may every admin add and delete other admins, or only a "main admin" (the owner) deletes admins while any admin may add up to the limit? (Recommended: the second. Ties to D14 and D20.)

@@ -212,3 +212,10 @@ Append-only history of what was built, why, and how to undo it. Newest entry at 
 - Sources: repo only, plus Cloudflare Web Analytics overview page (https://developers.cloudflare.com/web-analytics/, checked 2026-10-12: describes itself as privacy-first; the page did not state price, cookie use, setup or an API, so those are marked UNVERIFIED). MSG91's public login page showed no price or API information, so SMS cost is planned as an owner-supplied rate, marked UNVERIFIED.
 - NOT verified: all of it is a plan; no tile, function or table exists yet.
 - Cost impact: none now. Rollback: `git revert -m 1 <merge>`.
+
+### 2026-10-12 · Admin dashboard design revised (owner decision D21)
+- Branch: `docs/admin-dashboard-plan` (same PR).
+- Owner decision: the admin does not create candidates or employers; the admin can add another admin and can hard delete users and employers.
+- Changed in `docs/ADMIN_DASHBOARD.md` section 5, decisions and risks; roadmap D21 ticked with the answer, D26 (hard delete rules) and D27 (who may add / delete admins) opened.
+- Finding from the schema (checked in `supabase/migrations/20261011130000_core_schema.sql`): deleting a candidate works (applications and unlocks cascade, ledger rows keep the amount and lose the candidate link); deleting an employer is BLOCKED while it has wallet ledger rows (`on delete restrict`, deliberate so money records cannot vanish). The design needs the owner's choice in D26.
+- NOT verified: Supabase Auth admin delete behaviour in our Edge Function is a plan, not tested. Docs only, nothing built.
