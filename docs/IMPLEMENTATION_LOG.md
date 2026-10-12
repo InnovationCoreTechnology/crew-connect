@@ -165,3 +165,16 @@ Append-only history of what was built, why, and how to undo it. Newest entry at 
 - Cost impact: none (GitHub Actions free minutes for private repos; the job takes about 1-2 minutes). Dependencies changed: none.
 - Rollback: `git revert -m 1 <merge>`; the `develop` branch can stay (it equals `main` until the first change).
 - Needs owner: choose whether GitHub's default branch becomes `develop` (so new PRs target it by default); in Cloudflare Workers Builds set production branch `main` when connecting GitHub.
+
+### 2026-10-12 · Release v0.1.0 (first production merge)
+- What: PR #9 merged `develop` into `main` (merge `4464f5f`); `main` and `develop` have identical content. Annotated tag `v0.1.0` created on that merge by the owner.
+- Not done: the release PR template was not used and the sign-off line was not filled for this first release; the live site was not redeployed (still the manual 2026-10-11 deploy); SQL rule tests were last passed on 2026-10-12 (PR #6 fixes), no database change since.
+- Rollback: Cloudflare dashboard: redeploy previous deployment; git: `git revert -m 1 4464f5f` on a `hotfix/*` branch.
+
+### 2026-10-12 · 2.1 follow-up · Cloudflare branch (preview) builds fixed
+- Branch: `fix/wrangler-previews-block` (from `develop`).
+- Why: after connecting GitHub to Cloudflare Workers Builds, every branch build failed at the deploy step. Build log (pasted by the owner): the build itself succeeded, then `npx wrangler preview` stopped with "Your Wrangler configuration is missing a `previews` block".
+- What changed: `web/wrangler.jsonc` gets `"previews": {}` (valid when empty). Production settings stay at the top level.
+- Source (official, checked 2026-10-12): https://developers.cloudflare.com/workers/previews/configuration/ ("The `previews` block is required, but it can be empty if your Preview does not need separate settings").
+- Verification: `npm run build` clean; `npx wrangler deploy --dry-run` accepts the config and reads the same 13 asset files. NOT verified: that the next Cloudflare branch build succeeds (it runs on the PR); the docs do not state directly that the empty block leaves `wrangler deploy` unchanged, the dry run shows no change.
+- Cost impact: none. Rollback: `git revert -m 1 <merge>`.
