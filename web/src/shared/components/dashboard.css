@@ -86,3 +86,20 @@ th{color:var(--muted);font-weight:600;font-size:12px}
 .pv-steps{list-style:none;margin:0;padding:0;font-size:14px;color:var(--muted)}
 .pv-steps li{padding:3px 0}
 .pv-steps li.done{color:var(--ok)}
+
+/* My applications (features/candidate/ApplicationsTab.tsx) */
+.sr-only{position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+.linkbtn{background:none;border:0;padding:0;font:inherit;color:var(--text);text-decoration:underline;cursor:pointer}
+.empty p{margin:4px 0 12px}
+.applist{list-style:none;margin:0;padding:0;display:grid;gap:10px}
+.appcard{border:1px solid var(--line);border-radius:10px;padding:14px;background:var(--card)}
+.appcard h3{font-size:16px;margin:0}
+.appcard p{margin:0}
+.appcard .facts{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0}
+.tracker{list-style:none;display:flex;margin:8px 0 10px;padding:0}
+.tracker li{flex:1;position:relative;display:flex;flex-direction:column;align-items:center;gap:4px;font-size:12px;color:var(--muted)}
+.tracker .dot{width:12px;height:12px;border-radius:50%;background:var(--bg);border:2px solid var(--line);z-index:1}
+.tracker li+li::before{content:"";position:absolute;top:5px;right:50%;width:100%;height:2px;background:var(--line)}
+.tracker li.reached{color:var(--text)}
+.tracker li.reached .dot{background:var(--ok);border-color:var(--ok)}
+.tracker li.reached::before{background:var(--ok)}

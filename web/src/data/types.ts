@@ -62,6 +62,7 @@ export interface JobWithCompany extends Job {
 export interface ApplicationView {
   job: JobWithCompany
   status: ApplicationStatus
+  appliedAt: string // ISO time the candidate applied
 }
 
 export interface CandidateFilters {

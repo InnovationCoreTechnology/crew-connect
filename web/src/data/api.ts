@@ -126,6 +126,7 @@ export async function listApplications(): Promise<ApplicationView[]> {
   return data.map((r) => ({
     job: toJob({ ...r, created_at: r.applied_at }),
     status: oneOf<ApplicationStatus>(['Applied', 'Shortlisted', 'Rejected'], r.status),
+    appliedAt: r.applied_at,
   }))
 }
 
