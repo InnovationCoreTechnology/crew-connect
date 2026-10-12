@@ -1,0 +1,173 @@
+// Edge Function `account-auth`: the server side of "register", "forgot password" and the OTP checks.
+//
+// WHY it exists: Supabase's phone provider cannot be used (it needs Twilio-style credentials and does not support MSG91).
+// Logins are therefore a hidden email-style identity "<10 digits>@users.crewconnect.invalid" + password. Proving that someone
+// owns a mobile number is done with OUR OTP system in the database (supabase/migrations/20261011140000_own_otp_accounts.sql);
+// this function is the only caller of those database functions and of the Auth Admin API.
+//
+// Called by the browser (web/src/features/auth/services/supabaseAuthService.ts) BEFORE login, so it is deployed with
+// verify_jwt = false. That means this code must protect itself: every input is validated, OTP issue/check enforce cooldowns,
+// per-number and project-wide hourly caps and a per-code attempt limit INSIDE the database, and the OTP is never returned
+// to the browser (test numbers get the fixed dev code only because the database says so).
+//
+// Docs (official, checked 2026-10-11): Edge Functions secrets and auth, CORS, Auth Admin API createUser / updateUserById.
+//   https://supabase.com/docs/guides/functions/secrets · https://supabase.com/docs/guides/functions/auth
+//   https://supabase.com/docs/guides/functions/cors · https://supabase.com/docs/reference/javascript/auth-admin-createuser
+
+import { createClient } from 'npm:@supabase/supabase-js@2.117.3'
+import { corsHeaders } from 'npm:@supabase/supabase-js@2.117.3/cors'
+import { sendSms, smsConfigured } from './sms.ts'
+
+type Purpose = 'register' | 'reset'
+type Code =
+  | 'INVALID_INPUT' | 'ALREADY_REGISTERED' | 'NOT_REGISTERED' | 'RATE_LIMITED' | 'SMS_FAILED'
+  | 'INVALID_OTP' | 'OTP_EXPIRED' | 'TOO_MANY_ATTEMPTS' | 'WEAK_PASSWORD' | 'SAME_PASSWORD' | 'UNKNOWN'
+
+const PHONE = /^[6-9]\d{9}$/
+const OTP = /^\d{6}$/
+const toEmail = (phone: string) => `${phone}@users.crewconnect.invalid` // the same rule lives in the web app: keep both in step
+
+const reply = (body: Record<string, unknown>, status = 200) =>
+  new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+const ok = () => reply({ ok: true })
+const fail = (code: Code) => reply({ ok: false, code })
+
+// Same rule as validateNewPassword() in the web app, plus the 72-byte limit of the bcrypt hashing Supabase uses.
+function passwordProblem(password: string, phone: string): string | null {
+  if (password.length < 8 || password.length > 72) return 'length'
+  if (/\s/.test(password)) return 'spaces'
+  if (!/[A-Za-z]/.test(password) || !/\d/.test(password)) return 'letters+numbers'
+  if (password.includes(phone)) return 'contains phone'
+  return null
+}
+
+// The database raises short codes as the error message; anything else is UNKNOWN.
+const KNOWN: Code[] = ['INVALID_INPUT', 'ALREADY_REGISTERED', 'NOT_REGISTERED', 'RATE_LIMITED']
+const fromDb = (message: string): Code => KNOWN.find((c) => c === message) ?? 'UNKNOWN'
+const fromOtpStatus = (status: unknown): Code => {
+  if (status === 'INVALID_OTP' || status === 'OTP_EXPIRED') return status
+  if (status === 'LOCKED') return 'TOO_MANY_ATTEMPTS'
+  return 'UNKNOWN'
+}
+
+function adminClient() {
+  const url = Deno.env.get('SUPABASE_URL')
+  // New secret keys first; the legacy service_role key as the documented fallback.
+  const secretKeys = JSON.parse(Deno.env.get('SUPABASE_SECRET_KEYS') ?? '{}') as Record<string, string>
+  const key = secretKeys.default ?? Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
+  if (!url || !key) throw new Error('Edge Function secrets are missing')
+  return createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } })
+}
+
+Deno.serve(async (req) => {
+  if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
+  if (req.method !== 'POST') return reply({ ok: false, code: 'INVALID_INPUT' }, 405)
+
+  let body: Record<string, unknown>
+  try {
+    body = await req.json()
+  } catch {
+    return fail('INVALID_INPUT')
+  }
+
+  const phone = typeof body.phone === 'string' ? body.phone : ''
+  if (!PHONE.test(phone)) return fail('INVALID_INPUT')
+
+  try {
+    const db = adminClient()
+
+    /* ---------- send-otp: { phone, purpose } ---------- */
+    if (body.action === 'send-otp') {
+      const purpose = body.purpose
+      if (purpose !== 'register' && purpose !== 'reset') return fail('INVALID_INPUT')
+
+      const isTest = await db.rpc('auth_is_test_phone', { p_phone: phone })
+      if (isTest.error) return fail('UNKNOWN')
+      // No SMS gateway yet: refuse real numbers BEFORE a code is issued, so they do not burn their rate limit for nothing.
+      if (!isTest.data && !smsConfigured()) return fail('SMS_FAILED')
+
+      const issued = await db.rpc('auth_otp_issue', { p_phone: phone, p_purpose: purpose as Purpose })
+      if (issued.error) return fail(fromDb(issued.error.message))
+      const row = issued.data?.[0]
+      if (!row) return fail('UNKNOWN')
+
+      if (!row.is_test) {
+        try {
+          await sendSms(phone, `${row.code} is your Crew Connect OTP. It is valid for 5 minutes. Do not share it.`)
+        } catch {
+          return fail('SMS_FAILED')
+        }
+      }
+      return ok()
+    }
+
+    /* ---------- check-otp: { phone, purpose, otp } (does not use the code up) ---------- */
+    if (body.action === 'check-otp') {
+      const { purpose, otp } = body
+      if ((purpose !== 'register' && purpose !== 'reset') || typeof otp !== 'string' || !OTP.test(otp)) return fail('INVALID_INPUT')
+      const check = await db.rpc('auth_otp_check', { p_phone: phone, p_purpose: purpose as Purpose, p_code: otp, p_consume: false })
+      if (check.error) return fail('UNKNOWN')
+      return check.data === 'OK' ? ok() : fail(fromOtpStatus(check.data))
+    }
+
+    /* ---------- register: { phone, otp, password, role } ---------- */
+    if (body.action === 'register') {
+      const { otp, password, role } = body
+      if (typeof otp !== 'string' || !OTP.test(otp) || typeof password !== 'string' || (role !== 'candidate' && role !== 'employer')) {
+        return fail('INVALID_INPUT')
+      }
+      if (passwordProblem(password, phone)) return fail('WEAK_PASSWORD')
+
+      const check = await db.rpc('auth_otp_check', { p_phone: phone, p_purpose: 'register', p_code: otp, p_consume: false })
+      if (check.error) return fail('UNKNOWN')
+      if (check.data !== 'OK') return fail(fromOtpStatus(check.data))
+
+      const created = await db.auth.admin.createUser({ email: toEmail(phone), password, email_confirm: true })
+      if (created.error || !created.data.user) {
+        const code = created.error?.code
+        if (code === 'email_exists' || code === 'user_already_exists') return fail('ALREADY_REGISTERED')
+        if (code === 'weak_password') return fail('WEAK_PASSWORD')
+        console.error('createUser failed:', code, created.error?.message)
+        return fail('UNKNOWN')
+      }
+
+      const account = await db.rpc('auth_create_account', { p_user_id: created.data.user.id, p_phone: phone, p_role: role })
+      if (account.error) {
+        await db.auth.admin.deleteUser(created.data.user.id) // do not leave a login without an account behind
+        return fail(fromDb(account.error.message))
+      }
+      await db.rpc('auth_otp_check', { p_phone: phone, p_purpose: 'register', p_code: otp, p_consume: true })
+      return ok() // the browser now logs in with the password
+    }
+
+    /* ---------- reset-password: { phone, otp, password } ---------- */
+    if (body.action === 'reset-password') {
+      const { otp, password } = body
+      if (typeof otp !== 'string' || !OTP.test(otp) || typeof password !== 'string') return fail('INVALID_INPUT')
+      if (passwordProblem(password, phone)) return fail('WEAK_PASSWORD')
+
+      const check = await db.rpc('auth_otp_check', { p_phone: phone, p_purpose: 'reset', p_code: otp, p_consume: false })
+      if (check.error) return fail('UNKNOWN')
+      if (check.data !== 'OK') return fail(fromOtpStatus(check.data))
+
+      const found = await db.rpc('auth_find_user', { p_phone: phone })
+      if (found.error) return fail('UNKNOWN')
+      if (!found.data) return fail('NOT_REGISTERED')
+
+      const updated = await db.auth.admin.updateUserById(found.data, { password })
+      if (updated.error) {
+        if (updated.error.code === 'weak_password') return fail('WEAK_PASSWORD')
+        if (updated.error.code === 'same_password') return fail('SAME_PASSWORD')
+        console.error('updateUserById failed:', updated.error.code, updated.error.message)
+        return fail('UNKNOWN')
+      }
+      await db.rpc('auth_otp_check', { p_phone: phone, p_purpose: 'reset', p_code: otp, p_consume: true })
+      return ok()
+    }
+
+    return fail('INVALID_INPUT')
+  } catch (err) {
+    console.error('account-auth crashed:', err instanceof Error ? err.message : 'unknown error') // never log phone numbers, codes or passwords
+    return reply({ ok: false, code: 'UNKNOWN' }, 500)
+  }
+})

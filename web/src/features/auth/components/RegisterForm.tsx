@@ -13,25 +13,22 @@ interface Props {
 
 // New users: choose a role, verify the mobile number with an OTP, then create a password.
 // AuthPage remounts this component when the role is tapped, so every field starts empty.
-// The account (and its role) is created on the server after the password is saved.
+// The account (and its role) is created on the server after the password is chosen; the server checks the OTP again.
 export function RegisterForm({ role, onRoleChange, onSwitchToLogin }: Props) {
-  const { verifyOtp, completeRegistration } = useAuth()
-  const [verifiedPhone, setVerifiedPhone] = useState('') // set once the OTP is right -> shows the password step
+  const { register } = useAuth()
+  const [verified, setVerified] = useState<{ phone: string; otp: string } | null>(null) // set once the OTP is right -> shows the password step
 
   return (
     <>
       <h2>Create your account</h2>
-      {!verifiedPhone && <RoleToggle value={role} onChange={onRoleChange} />}
-      {verifiedPhone ? (
+      {!verified && <RoleToggle value={role} onChange={onRoleChange} />}
+      {verified ? (
         <NewPasswordForm
-          phone={verifiedPhone} idPrefix="reg" submitLabel="Create account"
-          onSubmit={(password) => completeRegistration(password, role)}
+          phone={verified.phone} idPrefix="reg" submitLabel="Create account"
+          onSubmit={(password) => register(verified.phone, verified.otp, password, role)}
         />
       ) : (
-        <PhoneOtpForm
-          purpose="register" idPrefix="reg"
-          onVerify={(phone, otp) => verifyOtp(phone, otp, 'register')} onVerified={setVerifiedPhone}
-        />
+        <PhoneOtpForm purpose="register" idPrefix="reg" onVerified={(phone, otp) => setVerified({ phone, otp })} />
       )}
       <p className="alt">Already registered? <button type="button" className="linkb" onClick={onSwitchToLogin}>Log in</button></p>
     </>

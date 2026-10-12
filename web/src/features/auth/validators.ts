@@ -24,6 +24,7 @@ export function validateLoginPassword(value: string): string {
 export function validateNewPassword(password: string, phone: string): string {
   if (!password) return 'Create a password.'
   if (/\s/.test(password)) return 'Password cannot have spaces.'
+  if (password.length > 72) return 'Use at most 72 characters.' // Supabase hashes passwords with bcrypt, which only reads 72 bytes
   if (password.length < AUTH_CONFIG.minPasswordLength) {
     return `Use at least ${AUTH_CONFIG.minPasswordLength} characters.`
   }
