@@ -3,12 +3,16 @@
   // WHAT: serves the built files in ./dist from Cloudflare's CDN. There is no server code (no "main" script).
   // WHY not_found_handling: the app uses client-side routes (/employer, /candidate, /admin). Without this, refreshing
   //   one of those URLs would show a 404; with it, unknown paths get index.html and React Router takes over.
+  // WHY previews: branch builds (e.g. develop, feat/*) run `wrangler preview`, which refuses to run without this block.
+  //   An empty block is valid ("required, but it can be empty"); production settings stay at the top level.
   // Docs: https://developers.cloudflare.com/workers/static-assets/
+  //   https://developers.cloudflare.com/workers/previews/configuration/ (checked 2026-10-12)
   "$schema": "./node_modules/wrangler/config-schema.json",
   "name": "crew-connect",
   "compatibility_date": "2026-10-11",
   "assets": {
     "directory": "./dist",
     "not_found_handling": "single-page-application"
-  }
+  },
+  "previews": {}
 }
