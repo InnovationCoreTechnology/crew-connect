@@ -1,12 +1,24 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useImperativeHandle, useRef, useState, type Ref } from 'react'
 
-// Cloudflare Turnstile ("I am not a robot" check) for single-page apps: explicit rendering.
-// The browser gets a one-time token (valid 300 s, usable once); the SERVER must verify it
-// (supabase/functions/account-auth/turnstile.ts). The widget alone protects nothing.
-// Docs (official, checked 2026-10-12): https://developers.cloudflare.com/turnstile/get-started/client-side-rendering/
+// Cloudflare Turnstile, run ON DEMAND: nothing happens when the form appears. The check starts only when the caller asks for
+// a token (the user ticked our "I'm not a robot" box, see HumanCheck), so switching tabs or an empty form never starts a challenge.
+// The token is valid 300 s and usable ONCE, and the SERVER must verify it (supabase/functions/account-auth/turnstile.ts):
+// the widget alone protects nothing. Cloudflare decides whether a visitor sees a checkbox or just "Success!".
+// Docs (official, checked 2026-10-12):
+//   https://developers.cloudflare.com/turnstile/get-started/client-side-rendering/
+//   https://developers.cloudflare.com/turnstile/get-started/client-side-rendering/widget-configurations/  (execution = 'execute', appearance = 'interaction-only')
 
 interface TurnstileApi {
-  render(container: HTMLElement, options: { sitekey: string; theme?: 'auto' | 'light' | 'dark'; callback: (token: string) => void; 'error-callback': () => void }): string
+  render(container: HTMLElement, options: {
+    sitekey: string
+    theme?: 'auto' | 'light' | 'dark'
+    execution?: 'render' | 'execute'
+    appearance?: 'always' | 'execute' | 'interaction-only'
+    callback: (token: string) => void
+    'error-callback': () => void
+  }): string
+  execute(container: HTMLElement | string): void
+  reset(widgetId: string): void
   remove(widgetId: string): void
 }
 const api = (): TurnstileApi | undefined => (window as unknown as { turnstile?: TurnstileApi }).turnstile
@@ -29,38 +41,77 @@ function loadScript(): Promise<void> {
   return scriptPromise
 }
 
-interface Props {
-  siteKey: string
-  onToken: (token: string | null) => void // null = no valid token right now (loading, failed, or just reset)
-  resetKey: number // change it to get a fresh challenge: a token can only be used once
+// What the parent can do with the widget.
+export interface TurnstileHandle {
+  // Starts the check and resolves with a fresh one-time token. Rejects if the check fails, is abandoned or takes too long.
+  getToken(): Promise<string>
 }
 
-export function TurnstileWidget({ siteKey, onToken, resetKey }: Props) {
+const TOKEN_TIMEOUT_MS = 120_000 // enough for a visitor who has to tick a checkbox
+
+interface Props {
+  siteKey: string
+  ref: Ref<TurnstileHandle>
+}
+
+interface Pending { resolve: (token: string) => void; reject: (reason: Error) => void; timer: ReturnType<typeof setTimeout> }
+
+export function TurnstileWidget({ siteKey, ref }: Props) {
   const box = useRef<HTMLDivElement>(null)
+  const widgetId = useRef<string | undefined>(undefined)
+  const pending = useRef<Pending | null>(null)
+  const used = useRef(false) // a widget that already produced a token must be reset before it can run again
   const [failed, setFailed] = useState(false)
 
+  const settle = (outcome: { token: string } | { error: Error }) => {
+    const p = pending.current
+    if (!p) return
+    clearTimeout(p.timer)
+    pending.current = null
+    if ('token' in outcome) p.resolve(outcome.token)
+    else p.reject(outcome.error)
+  }
+
   useEffect(() => {
-    let widgetId: string | undefined
     let cancelled = false
-    onToken(null)
     loadScript()
       .then(() => {
         const turnstile = api()
         if (cancelled || !box.current || !turnstile) return
-        setFailed(false)
-        widgetId = turnstile.render(box.current, {
+        widgetId.current = turnstile.render(box.current, {
           sitekey: siteKey,
           theme: 'auto',
-          callback: (token) => onToken(token),
-          'error-callback': () => onToken(null),
+          execution: 'execute', // do NOT start by itself
+          appearance: 'interaction-only', // visible only when Cloudflare really needs the visitor to do something
+          callback: (token) => settle({ token }),
+          'error-callback': () => settle({ error: new Error('Turnstile error') }),
         })
       })
       .catch(() => { if (!cancelled) setFailed(true) })
     return () => {
       cancelled = true
-      if (widgetId) api()?.remove(widgetId)
+      settle({ error: new Error('Turnstile removed') })
+      if (widgetId.current) api()?.remove(widgetId.current)
+      widgetId.current = undefined
+      used.current = false
     }
-  }, [siteKey, resetKey, onToken])
+  }, [siteKey])
+
+  useImperativeHandle(ref, () => ({
+    getToken() {
+      return new Promise<string>((resolve, reject) => {
+        const turnstile = api()
+        const id = widgetId.current
+        if (!turnstile || !id || !box.current) { reject(new Error('Turnstile is not ready')); return }
+        settle({ error: new Error('Superseded by a newer request') })
+        const timer = setTimeout(() => settle({ error: new Error('Turnstile timed out') }), TOKEN_TIMEOUT_MS)
+        pending.current = { resolve, reject, timer }
+        if (used.current) turnstile.reset(id) // the previous token is spent: start from a clean widget
+        used.current = true
+        turnstile.execute(box.current)
+      })
+    },
+  }), [])
 
   return (
     <div className="captcha">

@@ -21,3 +21,13 @@
 @media (max-width:760px){.lw{grid-template-columns:1fr;gap:20px}.lc{justify-self:center}.pts{display:none}.deco{font-size:90px}}
 
 .captcha{margin:10px 0 4px;min-height:0}
+
+/* "I'm not a robot" box (shared/components/HumanCheck.tsx). The global input style is 48px tall, so the checkbox is sized here. */
+.human{margin:10px 0 4px;border:1px solid var(--line);border-radius:8px;padding:10px 12px;background:var(--bg)}
+.human-row{display:flex;align-items:center;gap:10px}
+.human-row input{width:22px;height:22px;min-width:22px;padding:0;margin:0;cursor:pointer;accent-color:var(--ok)}
+.human-row label{margin:0;font-size:15px;color:var(--text);cursor:pointer}
+.human.done .human-row label{color:var(--ok);font-weight:600}
+.human.error .human-row label{color:var(--bad)}
+.human .captcha{margin:0}
+.human .captcha:not(:empty){margin-top:8px}

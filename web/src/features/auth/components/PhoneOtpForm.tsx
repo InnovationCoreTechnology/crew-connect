@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { TextField } from '../../../shared/components/TextField'
-import { TurnstileWidget } from '../../../shared/components/TurnstileWidget'
+import { HumanCheck } from '../../../shared/components/HumanCheck'
 import { useCountdown } from '../../../shared/hooks/useCountdown'
 import { AUTH_CONFIG } from '../config'
 import { useAuth } from '../context/useAuth'
@@ -22,8 +22,10 @@ interface Props {
 // It sends the SMS, runs the resend timer, counts wrong tries and shows friendly errors.
 // What happens after the OTP is right is up to the parent (it shows the password step). The OTP is checked here without
 // using it up; the server checks it again when the account is created / the password is changed.
-// Asking for an OTP (Send / Resend) needs a CAPTCHA token (Cloudflare Turnstile) when a site key is configured. A token works
-// once, so a fresh challenge is requested after every attempt. The SERVER verifies the token; this only collects it.
+// Asking for an OTP (Send / Resend) needs the user to tick "I'm not a robot" (Cloudflare Turnstile) when a site key is configured.
+// Nothing is checked until the box is ticked; every request needs a fresh tick because a token works only once. The box is shown
+// only where a code can be requested (first screen; OTP screen after the resend wait), never while the user is typing the OTP.
+// The SERVER verifies the token; this only collects it.
 export function PhoneOtpForm({ purpose, idPrefix, onVerified }: Props) {
   const { checkOtp } = useAuth()
   const countdown = useCountdown(AUTH_CONFIG.resendSeconds)
@@ -33,10 +35,22 @@ export function PhoneOtpForm({ purpose, idPrefix, onVerified }: Props) {
   const [errors, setErrors] = useState<Errors>({})
   const [tries, setTries] = useState(0)
   const [busy, setBusy] = useState(false)
-  const [captcha, setCaptcha] = useState<string | null>(null) // the current one-time Turnstile token
-  const [captchaRound, setCaptchaRound] = useState(0) // bump = ask Turnstile for a new challenge
+  const [captcha, setCaptcha] = useState<string | null>(null) // the one-time token from the ticked box
+  const [captchaRound, setCaptchaRound] = useState(0) // bump = new, unticked box
   const captchaRequired = AUTH_CONFIG.turnstileSiteKey !== ''
-  const needsCaptcha = captchaRequired && !captcha
+
+  // The token for this request (undefined when no CAPTCHA is configured). Throws CAPTCHA_FAILED when the box was not ticked.
+  function takeCaptchaToken(): string | undefined {
+    if (!captchaRequired) return undefined
+    if (!captcha) throw new AuthError('CAPTCHA_FAILED', "Please tick \"I'm not a robot\" first.")
+    return captcha
+  }
+  // A ticked box means the "please tick" message (or any older error) no longer applies.
+  function onCaptchaToken(token: string | null) {
+    setCaptcha(token)
+    if (token) setErrors((prev) => ({ ...prev, form: undefined }))
+  }
+  // The token is spent after every request (success or not): show a new, unticked box.
   const spendCaptcha = () => { if (captchaRequired) { setCaptcha(null); setCaptchaRound((n) => n + 1) } }
 
   const clearError = (key: keyof Errors) => setErrors((prev) => ({ ...prev, [key]: undefined, form: undefined }))
@@ -52,10 +66,9 @@ export function PhoneOtpForm({ purpose, idPrefix, onVerified }: Props) {
   async function submitPhone() {
     const message = validatePhone(phone)
     if (message) { setErrors({ phone: message }); return }
-    if (needsCaptcha) { setErrors({ form: 'Please wait for the security check to finish.' }); return }
     setBusy(true)
     try {
-      await authService.sendOtp(phone, purpose, captcha ?? undefined)
+      await authService.sendOtp(phone, purpose, takeCaptchaToken())
       setErrors({}); setOtp(''); setTries(0); setStep('otp'); countdown.start()
     } catch (err) {
       if (err instanceof AuthError && err.code === 'NOT_REGISTERED') setErrors({ phone: notRegistered })
@@ -95,10 +108,9 @@ export function PhoneOtpForm({ purpose, idPrefix, onVerified }: Props) {
   }
 
   async function resend() {
-    if (needsCaptcha) { setErrors({ form: 'Please wait for the security check to finish.' }); return }
     setBusy(true)
     try {
-      await authService.sendOtp(phone, purpose, captcha ?? undefined)
+      await authService.sendOtp(phone, purpose, takeCaptchaToken())
       setTries(0); setErrors({}); countdown.start()
     } catch (err) {
       setErrors({ form: err instanceof AuthError ? err.message : 'Something went wrong. Please try again.' })
@@ -129,15 +141,18 @@ export function PhoneOtpForm({ purpose, idPrefix, onVerified }: Props) {
           <p className="rs">
             {countdown.left > 0
               ? <span>Resend OTP in {countdown.left}s</span>
-              : <button type="button" className="linkb" disabled={busy || needsCaptcha} onClick={resend}>Resend OTP</button>}
+              : <button type="button" className="linkb" disabled={busy} onClick={resend}>Resend OTP</button>}
             <button type="button" className="linkb" onClick={() => backToPhone()}>Change number</button>
           </p>
         </>
       )}
 
-      {captchaRequired && <TurnstileWidget siteKey={AUTH_CONFIG.turnstileSiteKey} onToken={setCaptcha} resetKey={captchaRound} />}
+      {/* Needed only to ask for a code: on the first screen, and on the OTP screen once the wait is over and Resend is available. */}
+      {captchaRequired && (step === 'phone' || countdown.left === 0) && (
+        <HumanCheck key={captchaRound} siteKey={AUTH_CONFIG.turnstileSiteKey} onToken={onCaptchaToken} disabled={busy} />
+      )}
       {errors.form && <p className="ferr" role="alert">{errors.form}</p>}
-      <button type="button" className="btn big full" disabled={busy || (step === 'phone' && needsCaptcha)} onClick={submit}>
+      <button type="button" className="btn big full" disabled={busy} onClick={submit}>
         {busy ? 'Please wait…' : step === 'phone' ? 'Send OTP' : 'Verify OTP'}
       </button>
     </>
