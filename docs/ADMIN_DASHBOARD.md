@@ -97,6 +97,8 @@ Free for the screens (Postgres only). Analytics: planned as a free tool (to veri
 
 ## 9. Decisions the owner must answer
 
+> **Update 2026-10-12:** the owner delegated these choices in writing, and they are recorded as decided in `DEVELOPMENT_ROADMAP.md` section 7 (D12 to D27, each with the chosen answer). The questions below are kept for history. Only the SMS rate (D24) is still needed from the owner.
+
 - **D12 to D17** (in the roadmap, from ADMIN_CONTROLLED_LISTS.md): designation names, one or many designations per candidate, who edits lists, cities, user-suggested designations, shift and availability.
 - **D18. Visitors:** which count do you want: unique visitors, page views, or both? Is a link to Cloudflare's own analytics dashboard acceptable if our dashboard cannot read the numbers? (Recommended: link first.)
 - **D19. Revenue before real payments:** show "Revenue (demo credits)" until Phase 3, or hide revenue and net until then? (Recommended: show, clearly labelled.)

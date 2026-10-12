@@ -238,3 +238,10 @@ Append-only history of what was built, why, and how to undo it. Newest entry at 
 - Rollback: `git revert -m 1 <merge>`; database: run the rollback script as a new migration.
 - Next in the build order: audit table (4.9), then Approvals queue.
 
+### 2026-10-12 · Admin decisions D12-D27 recorded
+- Branch: `docs/admin-decisions` (from `develop`). Documentation only.
+- Why: the owner asked Claude to pick the best option "as suited in the current available market". CLAUDE.md allows a delegated decision when it is recorded in the roadmap, so each choice is ticked in `DEVELOPMENT_ROADMAP.md` section 7 with the answer and the note that the owner can change it.
+- Basis: the recommendations were reasoned from common practice and from this product's risks (blue-collar users, privacy, money records). They were NOT checked against Naukri, Apna or other apps: their screens and category lists are not official documentation and cannot be cited. The starter designation lists (D12) are common industry job titles and the admin can edit them any time.
+- Still needed from the owner: the SMS rate card value (D24), later.
+- Rollback: `git revert -m 1 <merge>`.
+

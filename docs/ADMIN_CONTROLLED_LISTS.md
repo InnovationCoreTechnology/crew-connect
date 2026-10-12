@@ -106,6 +106,8 @@ None. Plain Postgres tables; no new service or dependency.
 
 ## 9. Open decisions for the owner (do not build before answered)
 
+> **Update 2026-10-12:** the owner delegated these choices in writing, and they are recorded as decided in `DEVELOPMENT_ROADMAP.md` section 7 (D12 to D27, each with the chosen answer). The questions below are kept for history. Only the SMS rate (D24) is still needed from the owner.
+
 - **D12.** The starter **designation names** for Security and for Housekeeping (the owner supplies them; Claude does not invent job titles).
 - **D13.** Can a candidate choose **one** designation or **several**? (Several needs a join table and changes search; recommended: one now.)
 - **D14.** Who may edit the lists: every admin, or only a "super admin"? (Today there is one admin.)
