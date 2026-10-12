@@ -170,3 +170,11 @@ Append-only history of what was built, why, and how to undo it. Newest entry at 
 - What: PR #9 merged `develop` into `main` (merge `4464f5f`); `main` and `develop` have identical content. Annotated tag `v0.1.0` created on that merge by the owner.
 - Not done: the release PR template was not used and the sign-off line was not filled for this first release; the live site was not redeployed (still the manual 2026-10-11 deploy); SQL rule tests were last passed on 2026-10-12 (PR #6 fixes), no database change since.
 - Rollback: Cloudflare dashboard: redeploy previous deployment; git: `git revert -m 1 4464f5f` on a `hotfix/*` branch.
+
+### 2026-10-12 · Design: admin-controlled lists (roadmap 4.6)
+- Branch: `docs/admin-controlled-lists` (from `develop`). Documentation only, nothing built.
+- Why: the owner wants designations under each job type (like job apps) and wants an admin, not a developer, to control the main list, the sub list and any other data that changes by name only.
+- What: `docs/ADMIN_CONTROLLED_LISTS.md` (what is admin-controlled vs fixed, table design with RLS and an audit log, expand/contract migration, admin "Lists" tab, build order, risks), roadmap 4.6 rewritten and blocked on new open decisions D12-D17.
+- Sources: none external; based on the repo's own schema and code (checked 2026-10-12). No library or service claims made.
+- NOT verified: nothing is implemented or tested; design needs the owner's answers to D12-D17.
+- Cost impact: none planned. Rollback: `git revert -m 1 <merge>`.

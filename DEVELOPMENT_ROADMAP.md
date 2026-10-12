@@ -154,6 +154,12 @@ main                  <- production; only tested, owner-approved releases; every
 - [ ] D9. Verification depth: ID photo only, or also police verification partner?
 - [ ] D10. Success-metric targets for first 90 days?
 - [ ] D11. Product name/domain final? ("Crew Connect" confirmed?)
+- [ ] D12. Starter designation names for Security and for Housekeeping (owner supplies them)
+- [ ] D13. Candidate picks one designation or several? (recommended: one)
+- [ ] D14. Who edits the admin lists: every admin or a super admin?
+- [ ] D15. Bangalore only, or build the city table now? (recommended: city table now, only Bangalore shown)
+- [ ] D16. Can users suggest a missing designation, or admin-only? (recommended: admin-only first)
+- [ ] D17. Keep Shift and Availability fixed in code (recommended) or admin lists?
 
 ---
 
@@ -224,7 +230,7 @@ Why: today employers cannot post jobs, so the candidate side has nothing to appl
 - [ ] 4.3 Applicant pipeline per job: Applied → Shortlisted → Interview → Hired / Rejected
 - [ ] 4.4 Candidate sees status changes in "My applications"
 - [ ] 4.5 Pagination + server-side filtering for candidates and jobs — candidates and unlocked lists are DONE in Phase 1 (keyset paging + Load more); jobs (capped at 100) and admin lists (capped at 500) remain
-- [ ] 4.6 Make job types/areas data-driven (tables) instead of hard-coded lists in `config.ts`
+- [ ] 4.6 Admin-controlled lists (job categories + designations, cities + areas, business numbers, reasons) instead of hard-coded lists in `config.ts` and CHECK constraints. DESIGN written 2026-10-12: [docs/ADMIN_CONTROLLED_LISTS.md](docs/ADMIN_CONTROLLED_LISTS.md); build order there (DB -> admin Lists tab -> candidate/job/search screens -> areas -> numbers/reasons -> cleanup). **Blocked on D12-D17**
 - [ ] 4.7 Job expiry and "filled" state
 **Exit check:** full loop works with real accounts: post job → candidate applies → employer shortlists → candidate sees it.
 
@@ -296,3 +302,4 @@ Why: product is only proven by real usage.
 | 2026-10-12 | CAPTCHA now runs ON DEMAND (only when Send / Resend OTP is pressed) | `fix/captcha-on-demand` | see git log | `git revert -m 1 <merge>` |
 | 2026-10-12 | 2.13 Branching model main/develop, CI, PR/release templates, CODEOWNERS, release process | `docs/branching-strategy` into `develop` | see git log | `git revert -m 1 <merge>` |
 | 2026-10-12 | Release v0.1.0 (first release: develop -> main via PR #9; tag on `4464f5f`; the release template was NOT used for this first one) | `develop` into `main` | 4464f5f | Cloudflare: redeploy previous deployment; git: `git revert -m 1 4464f5f` on a `hotfix/*` branch |
+| 2026-10-12 | Design for admin-controlled lists (4.6), decisions D12-D17 opened | `docs/admin-controlled-lists` into `develop` | see git log | `git revert -m 1 <merge>` |
