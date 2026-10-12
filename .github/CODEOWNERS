@@ -1,0 +1,10 @@
+# Who must review changes to which files. GitHub asks these people for review automatically.
+# NOTE: GitHub can only REQUIRE this review (block merging without it) once branch protection is available
+# (GitHub Pro or a public repo). Until then it is a request, not a lock. See docs/RELEASE_PROCESS.md.
+# When more developers join, add them per area here, but keep the owner on the sensitive paths below.
+
+*                              @InnovationCoreTechnology
+/supabase/                     @InnovationCoreTechnology
+/.github/                      @InnovationCoreTechnology
+/CLAUDE.md                     @InnovationCoreTechnology
+/DEVELOPMENT_ROADMAP.md        @InnovationCoreTechnology

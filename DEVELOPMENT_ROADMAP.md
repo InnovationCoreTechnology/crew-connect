@@ -67,37 +67,37 @@ Candidates registered/verified · employers approved · unlocks per employer · 
 
 ## 3. Branching & rollback strategy
 
-Goal: **any change can be undone in one step**, and `main` is always deployable.
+Goal: **`main` is production and always works; any change can be undone in one step.** Full process, gate checklist and limits: [docs/RELEASE_PROCESS.md](docs/RELEASE_PROCESS.md). Decided by the owner 2026-10-12 (replaces the earlier `phase/N-*` branch model; phase names below are now only labels for groups of tasks).
 
 ```
-main                       ← always working/deployable; protected; only receives merges
- └─ phase/N-name           ← one long-lived branch per phase (e.g. phase/1-backend-auth)
-     └─ feat/<topic>       ← short branch per task (e.g. feat/supabase-client)
-     └─ fix/<topic>        ← bug fixes
-     └─ docs/<topic>       ← docs only
+main                  <- production; only tested, owner-approved releases; every release is tagged v0.x.y
+ └─ develop           <- integration / staging; the next release candidate
+     └─ feat|fix|docs|chore/<topic>   <- one short branch per task, cut from develop
+ └─ hotfix/<topic>    <- urgent production fix, cut from main, merged back into develop
 ```
 
 **Flow for every task**
-1. `git checkout main && git pull` → `git checkout -b phase/N-name` (once per phase).
-2. `git checkout -b feat/<topic>` from the phase branch → work → commit small, clear commits (`feat(web): …`).
-3. Merge `feat/*` into `phase/N-*` using a **merge commit (`--no-ff`)** so each task is one revertable unit.
-4. When the whole phase checklist is done and verified → open a PR `phase/N-*` → `main`, merge with `--no-ff`, then **tag**: `phase-N-done` (and `v0.N.0`).
+1. `git checkout develop && git pull` -> `git checkout -b feat/<topic>` -> small, clear commits (`feat(web): ...`).
+2. PR into `develop` (default template). CI must be green. Merge with a merge commit (`--no-ff`) so each task is one revertable unit.
+3. **Release:** when the owner decides `develop` is ready, a PR `develop` -> `main` using the release template. Every box needs evidence; the owner signs the approval line; migrations are applied with a backup first; merge with `--no-ff`; tag `v0.<phase>.<n>`.
 
 **Rollback options (pick the smallest that fixes it)**
 | Situation | Command |
 |---|---|
-| Undo one task already merged into a phase branch | `git revert -m 1 <merge-commit>` |
-| Undo a whole phase already in `main` | `git revert -m 1 <phase-merge-commit>` (new commit, safe, history kept) |
-| Go back to a known good state to inspect | `git checkout phase-N-done` (tag) |
-| Production broken right now | Redeploy previous deployment from hosting dashboard (instant, no git needed) – see Phase 2 |
+| Undo one task already merged into `develop` | `git revert -m 1 <merge-commit>` |
+| Undo a whole release already in `main` | `git revert -m 1 <release-merge-commit>` on a `hotfix/*` branch (new commit, safe, history kept) |
+| Go back to a known good state to inspect | `git checkout v0.x.y` (release tag) |
+| Production broken right now | Redeploy the previous deployment from the Cloudflare dashboard (instant, no git needed) - see Phase 2 |
 | Bad database change | Ship a **new forward "compensating" migration** that reverses the change (Supabase applies migrations forward; it does not run paired `down` files automatically). Reversing a destructive change (drop column/table, delete rows) **cannot restore data**, so before applying one: take a backup (`pg_dump`, Phase 2.10), apply on a test/branch database first, and rehearse the restore. See Phase 1.3 |
 
 **Rules**
-- Never `git push --force` on `main`. Never rewrite published history.
-- Never delete a phase branch or tag until the owner says so.
+- Never commit or push directly to `main` or `develop`; never `git push --force` on them; never rewrite published history.
+- Never delete a branch or tag until the owner says so.
+- Only `develop` goes to `main`, and only through the release PR (or a hotfix PR). Nothing reaches `main` that is not tested and approved by the owner.
 - Database and code changes of a task live in the **same branch**, but reverting the code does **not** undo an already-applied database migration. Roll back the database separately with a compensating migration or a backup restore (see the rollback table). Prefer additive, backward-compatible migrations (add columns/tables first, remove old ones in a later release) so old code keeps working.
-- Risky features go behind a **feature flag**. A flag in `web/src/app/config.ts` is compiled into the bundle, so changing it needs a new build and deploy (still quick, but not instant). For an **instant kill switch without redeploying**, store the flag server-side (a Supabase `feature_flags` table read at app start) – decided per feature in the phase that needs it.
-- Claude pushes/merges only when the owner says so.
+- Risky features go behind a **feature flag**. A flag in `web/src/app/config.ts` is compiled into the bundle, so changing it needs a new build and deploy (still quick, but not instant). For an **instant kill switch without redeploying**, store the flag server-side (a Supabase `feature_flags` table read at app start) - decided per feature in the phase that needs it.
+- Claude pushes, opens PRs and merges only when the owner says so.
+- **Enforcement today is process + CI only:** GitHub Free cannot lock branches on a private repo (checked 2026-10-12). Upgrade tracked in 2.11.
 
 ---
 
@@ -201,6 +201,9 @@ Why: deploy early and often so every later phase is tested in real conditions, a
 - [ ] 2.8 Custom domain + HTTPS (domain cost → Cost tracker)
 - [ ] 2.9 Write "How to roll back production" in this file after testing it once for real
 - [ ] 2.10 Supabase free-tier keep-alive + manual backup routine (free projects pause and lack backups) – export SQL weekly until paid plan
+- [ ] 2.11 Before a second developer joins: GitHub Pro (or org plan) and branch protection / rulesets on `main` and `develop` (require PR, require the CI check, 1 Code Owner approval, no force-push/delete). Price -> Cost tracker, owner approves first
+- [ ] 2.12 Before real users: separate production Supabase project + a staging address for `develop` (Cloudflare Workers Builds: production branch `main`, `develop` builds get preview URLs); `main` deploys to production only
+- [x] 2.13 Branching model main/develop, CI workflow, PR + release templates, CODEOWNERS, `docs/RELEASE_PROCESS.md` (2026-10-12; the CI check's first real run is on the PR of this task)
 **Exit check:** merging to `main` auto-deploys; a deliberate bad deploy was rolled back successfully in under 2 minutes.
 
 ### Phase 3 – Payments & wallet  *(branch: `phase/3-payments`)*
@@ -291,3 +294,4 @@ Why: product is only proven by real usage.
 | 2026-10-12 | 1.12 CAPTCHA (Turnstile) on OTP requests | `phase/1b-password-login` (task `feat/captcha`) | see git log | `git revert -m 1 <merge>`; Edge Function: redeploy the previous version (v2/v3 differ only by the CAPTCHA lines) |
 | 2026-10-12 | PR #6 review: 8 findings fixed (orphan login recovery, number-probing limits + per-IP limit, dev_mode switch, OTP retention, consume check, advisory lock, 72 BYTES, sessions ended after reset) | `fix/pr6-review` into `phase/1b-password-login` | see git log | `git revert -m 1 <merge>`; database `supabase/rollback/20261012100000_otp_review_fixes.down.sql`; Edge Function: redeploy version 3 |
 | 2026-10-12 | CAPTCHA now runs ON DEMAND (only when Send / Resend OTP is pressed) | `fix/captcha-on-demand` | see git log | `git revert -m 1 <merge>` |
+| 2026-10-12 | 2.13 Branching model main/develop, CI, PR/release templates, CODEOWNERS, release process | `docs/branching-strategy` into `develop` | see git log | `git revert -m 1 <merge>` |

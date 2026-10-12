@@ -70,8 +70,10 @@ When analysing the repo, starting a phase, or touching `package.json`:
 
 ## 6. Branching, safety and rollback
 
-Follow `DEVELOPMENT_ROADMAP.md` §3. In short:
-- **Never commit to `main`.** One branch per task (`feat/…`, `fix/…`, `docs/…`, `chore/…`) inside a `phase/N-…` branch. Merge with `--no-ff` so every task reverts with one `git revert -m 1`.
+Follow `DEVELOPMENT_ROADMAP.md` §3 and `docs/RELEASE_PROCESS.md`. In short:
+- **`main` = production, `develop` = integration.** Never commit or push directly to either. Cut one branch per task (`feat/…`, `fix/…`, `docs/…`, `chore/…`) from `develop`; PRs go **into `develop`**. Merge with `--no-ff` so every task reverts with one `git revert -m 1`.
+- Only `develop` reaches `main`, through a release PR using `.github/PULL_REQUEST_TEMPLATE/release.md`, opened only when the owner asks and every checklist item has evidence. The owner's approval is the stakeholder gate; never merge it yourself. Urgent production fixes use `hotfix/*` from `main`, then are merged back into `develop`.
+- If a PR is red (CI) or a checklist item is unverified, say so; never call it ready.
 - Never force-push shared branches, never rewrite published history, never delete branches/tags unless the owner says so.
 - **Push, open PRs and merge only when the owner asks.**
 - Risky behaviour goes behind a feature flag; database changes ship with a reversal script in the same branch (applied as a new forward migration; it cannot restore deleted data).
