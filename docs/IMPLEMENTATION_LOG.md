@@ -174,3 +174,8 @@ Append-only history of what was built, why, and how to undo it. Newest entry at 
 - NOT verified: the screen in a browser (login goes to the remote Supabase project; I do not enter credentials there). Owner to check: new candidate sees the form and, after Save, the card; Edit profile and Cancel work; the strength shows 60% (unverified) or 100% (verified). No unit test: Vitest arrives with roadmap 2.4.
 - Not built (needs new fields, separate task): photo, languages, skills, about-me. The ID step says "earns the trust badge"; there is no candidate-side ID submission yet (roadmap Phase 5).
 - Rollback: `git revert -m 1 <merge>`.
+
+### 2026-10-12 · Release v0.1.0 (first production merge)
+- What: PR #9 merged `develop` into `main` (merge `4464f5f`); `main` and `develop` have identical content. Annotated tag `v0.1.0` created on that merge by the owner.
+- Not done: the release PR template was not used and the sign-off line was not filled for this first release; the live site was not redeployed (still the manual 2026-10-11 deploy); SQL rule tests were last passed on 2026-10-12 (PR #6 fixes), no database change since.
+- Rollback: Cloudflare dashboard: redeploy previous deployment; git: `git revert -m 1 4464f5f` on a `hotfix/*` branch.

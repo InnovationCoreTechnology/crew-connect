@@ -297,3 +297,4 @@ Why: product is only proven by real usage.
 | 2026-10-12 | CAPTCHA now runs ON DEMAND (only when Send / Resend OTP is pressed) | `fix/captcha-on-demand` | see git log | `git revert -m 1 <merge>` |
 | 2026-10-12 | 2.13 Branching model main/develop, CI, PR/release templates, CODEOWNERS, release process | `docs/branching-strategy` into `develop` | see git log | `git revert -m 1 <merge>` |
 | 2026-10-12 | Saved candidate profile view (card + profile strength + Edit) | `feat/candidate-profile-view` into `develop` | see git log | `git revert -m 1 <merge>` |
+| 2026-10-12 | Release v0.1.0 (first release: develop -> main via PR #9; tag on `4464f5f`; the release template was NOT used for this first one) | `develop` into `main` | 4464f5f | Cloudflare: redeploy previous deployment; git: `git revert -m 1 4464f5f` on a `hotfix/*` branch |
