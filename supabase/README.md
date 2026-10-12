@@ -34,8 +34,12 @@ they are the API, and each one checks the caller's role itself (proved by `tests
 - Concurrency of two simultaneous unlocks is protected by `SELECT … FOR UPDATE` on the employer row and the primary key on
   `unlocks`, but a true parallel test is not automated yet (the SQL test runs in one session).
 
+## Tests
+- `tests/rules.test.sql` - database rules (run in the SQL editor / MCP; ends with "ALL TESTS PASSED (rolled back)").
+- `tests/turnstile.test.mjs` - the CAPTCHA verification module against Cloudflare's real Siteverify with its dummy keys: `node supabase/tests/turnstile.test.mjs` (Node 22.18+, needs internet, no account).
+
 ## Edge Function secrets
-`account-auth` needs no secret of ours today (Supabase injects `SUPABASE_URL` and the secret keys into every function). When the SMS gateway is connected, its credentials are added in the Supabase dashboard (Edge Functions -> Secrets), never in the repo.
+Supabase injects `SUPABASE_URL` and the secret keys into every function. We add one: `TURNSTILE_SECRET_KEY` (the CAPTCHA secret from Cloudflare -> Turnstile). When the SMS gateway is connected, its credentials go in the same place (Edge Functions -> Secrets), never in the repo. With no `TURNSTILE_SECRET_KEY` set, only the dev test numbers work.
 
 ## Dev data
 `seed/dev_seed.sql` creates fake logins WITH passwords (candidate, employer, admin and 23 other people, 5 jobs) and lists the 10 DEV test numbers (fixed OTP 123456, no SMS) so every screen can

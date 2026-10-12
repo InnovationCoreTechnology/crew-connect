@@ -9,6 +9,7 @@ export type AuthErrorCode =
   | 'TOO_MANY_ATTEMPTS' // this code is locked after too many wrong guesses: ask for a new one
   | 'RATE_LIMITED' // too many OTP requests: ask the user to wait
   | 'SMS_FAILED' // the SMS could not be sent (no gateway yet, or the gateway failed)
+  | 'CAPTCHA_FAILED' // the security check (Turnstile) was missing, expired, used already or rejected
   | 'WEAK_PASSWORD' // refused by the server's password rules
   | 'SAME_PASSWORD' // the new password equals the old one
   | 'UNKNOWN'
@@ -30,7 +31,8 @@ export class AuthError extends Error {
 // or the password is changed: the server never trusts the browser to say "the OTP was fine".
 export interface AuthService {
   // Texts a 6-digit OTP. `register` refuses a number that already has an account; `reset` refuses one that has none.
-  sendOtp(phone: string, purpose: OtpPurpose): Promise<void>
+  // `captchaToken` = the one-time Turnstile token (a new one is needed for every call). Throws CAPTCHA_FAILED if it is refused.
+  sendOtp(phone: string, purpose: OtpPurpose, captchaToken?: string): Promise<void>
   // Checks a code WITHOUT using it up. Throws INVALID_OTP / OTP_EXPIRED / TOO_MANY_ATTEMPTS.
   checkOtp(phone: string, purpose: OtpPurpose, otp: string): Promise<void>
   // Creates the account (login + role) and logs the person in. Re-checks the OTP on the server.
