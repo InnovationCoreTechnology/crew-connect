@@ -23,7 +23,8 @@ interface Props {
 // What happens after the OTP is right is up to the parent (it shows the password step). The OTP is checked here without
 // using it up; the server checks it again when the account is created / the password is changed.
 // Asking for an OTP (Send / Resend) needs the user to tick "I'm not a robot" (Cloudflare Turnstile) when a site key is configured.
-// Nothing is checked until the box is ticked; every request needs a fresh tick because a token works only once.
+// Nothing is checked until the box is ticked; every request needs a fresh tick because a token works only once. The box is shown
+// only where a code can be requested (first screen; OTP screen after the resend wait), never while the user is typing the OTP.
 // The SERVER verifies the token; this only collects it.
 export function PhoneOtpForm({ purpose, idPrefix, onVerified }: Props) {
   const { checkOtp } = useAuth()
@@ -141,7 +142,10 @@ export function PhoneOtpForm({ purpose, idPrefix, onVerified }: Props) {
         </>
       )}
 
-      {captchaRequired && <HumanCheck key={captchaRound} siteKey={AUTH_CONFIG.turnstileSiteKey} onToken={setCaptcha} disabled={busy} />}
+      {/* Needed only to ask for a code: on the first screen, and on the OTP screen once the wait is over and Resend is available. */}
+      {captchaRequired && (step === 'phone' || countdown.left === 0) && (
+        <HumanCheck key={captchaRound} siteKey={AUTH_CONFIG.turnstileSiteKey} onToken={setCaptcha} disabled={busy} />
+      )}
       {errors.form && <p className="ferr" role="alert">{errors.form}</p>}
       <button type="button" className="btn big full" disabled={busy} onClick={submit}>
         {busy ? 'Please wait…' : step === 'phone' ? 'Send OTP' : 'Verify OTP'}
