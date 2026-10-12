@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { TextField } from '../../../shared/components/TextField'
 import { useCountdown } from '../../../shared/hooks/useCountdown'
 import { AUTH_CONFIG } from '../config'
+import { useAuth } from '../context/useAuth'
 import { authService } from '../services'
 import { AuthError } from '../services/types'
 import type { OtpPurpose } from '../types'
@@ -13,14 +14,15 @@ interface Errors { phone?: string; otp?: string; form?: string }
 interface Props {
   purpose: OtpPurpose // 'register' (new account) or 'reset' (forgot password)
   idPrefix: string // keeps input ids unique when two forms exist
-  onVerify: (phone: string, otp: string) => Promise<void> // checks the OTP (see AuthContext.verifyOtp)
-  onVerified: (phone: string) => void // the OTP was right: the parent now asks for the password
+  onVerified: (phone: string, otp: string) => void // the OTP was right: the parent keeps both and now asks for the password
 }
 
 // The shared "mobile number -> OTP" steps used by Register and Forgot password.
 // It sends the SMS, runs the resend timer, counts wrong tries and shows friendly errors.
-// What happens after the OTP is right is up to the parent (it shows the password step).
-export function PhoneOtpForm({ purpose, idPrefix, onVerify, onVerified }: Props) {
+// What happens after the OTP is right is up to the parent (it shows the password step). The OTP is checked here without
+// using it up; the server checks it again when the account is created / the password is changed.
+export function PhoneOtpForm({ purpose, idPrefix, onVerified }: Props) {
+  const { checkOtp } = useAuth()
   const countdown = useCountdown(AUTH_CONFIG.resendSeconds)
   const [step, setStep] = useState<Step>('phone')
   const [phone, setPhone] = useState('')
@@ -48,6 +50,7 @@ export function PhoneOtpForm({ purpose, idPrefix, onVerify, onVerified }: Props)
       setErrors({}); setOtp(''); setTries(0); setStep('otp'); countdown.start()
     } catch (err) {
       if (err instanceof AuthError && err.code === 'NOT_REGISTERED') setErrors({ phone: notRegistered })
+      else if (err instanceof AuthError && err.code === 'ALREADY_REGISTERED') setErrors({ phone: alreadyRegistered })
       else setErrors({ form: err instanceof AuthError ? err.message : 'Something went wrong. Please try again.' })
     } finally {
       setBusy(false)
@@ -59,13 +62,14 @@ export function PhoneOtpForm({ purpose, idPrefix, onVerify, onVerified }: Props)
     if (message) { setErrors({ otp: message }); return }
     setBusy(true)
     try {
-      await onVerify(phone, otp)
+      await checkOtp(phone, otp, purpose)
       countdown.stop()
-      onVerified(phone)
+      onVerified(phone, otp)
     } catch (err) {
       if (!(err instanceof AuthError)) { setErrors({ form: 'Something went wrong. Please try again.' }); return }
       if (err.code === 'NOT_REGISTERED') { backToPhone(notRegistered); return }
       if (err.code === 'ALREADY_REGISTERED') { backToPhone(alreadyRegistered); return }
+      if (err.code === 'OTP_EXPIRED' || err.code === 'TOO_MANY_ATTEMPTS') { setErrors({ form: err.message }); return } // use Resend OTP
       if (err.code === 'INVALID_OTP') {
         const used = tries + 1
         setTries(used)

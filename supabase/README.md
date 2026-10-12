@@ -11,6 +11,7 @@ Project: **crew-connect**, region **ap-south-1 (Mumbai)**, ref `qehkkituvqaishys
 | `tests/` | `rules.test.sql`: proves the security and money rules. | Run after every migration. |
 | `admin/` | `create_admin.sql`: how an admin is made (never from the app). | By hand, once per admin. |
 | `seed/` | `dev_seed.sql`: fake test accounts and data (DEV only). | By hand, when you want test data. |
+| `functions/` | Edge Functions (`account-auth`: register, OTP, password reset). | Deployed with the Supabase MCP `deploy_edge_function` or the CLI. The deployed copy must match the repo; its `verify_jwt` is `false` on purpose (it runs before login). |
 
 ## Rules for every change (from CLAUDE.md)
 1. New migration file `YYYYMMDDHHMMSS_name.sql` + its `rollback/…down.sql`. Never edit a migration that was already applied.
@@ -33,8 +34,11 @@ they are the API, and each one checks the caller's role itself (proved by `tests
 - Concurrency of two simultaneous unlocks is protected by `SELECT … FOR UPDATE` on the employer row and the primary key on
   `unlocks`, but a true parallel test is not automated yet (the SQL test runs in one session).
 
+## Edge Function secrets
+`account-auth` needs no secret of ours today (Supabase injects `SUPABASE_URL` and the secret keys into every function). When the SMS gateway is connected, its credentials are added in the Supabase dashboard (Edge Functions -> Secrets), never in the repo.
+
 ## Dev data
-`seed/dev_seed.sql` creates fake logins WITH passwords (candidate, employer, admin and 23 other people, 5 jobs) so every screen can
+`seed/dev_seed.sql` creates fake logins WITH passwords (candidate, employer, admin and 23 other people, 5 jobs) and lists the 10 DEV test numbers (fixed OTP 123456, no SMS) so every screen can
 be tried without SMS. Replace the three password placeholders with your own passwords first, keep them in a git-ignored file
 (for example `web/.seed-credentials.local`), and run it only on the DEV project. It is safe to run again. The earlier key-based
 script `web/scripts/seed-dev.mjs` was removed because it created logins without passwords.
