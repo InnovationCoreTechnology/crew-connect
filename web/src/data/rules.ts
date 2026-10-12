@@ -1,4 +1,4 @@
-import type { ApplicationStatus, ApplicationView, CandidateProfile, Employer } from './types'
+import type { ApplicationStatus, ApplicationView, CandidateProfile, Employer, OverviewRange } from './types'
 
 // Business rules in plain functions, so they are easy to find, test and change.
 // IMPORTANT: these only decide what the SCREEN shows. The same rules are enforced again in the database
@@ -51,4 +51,20 @@ export function applicationSteps(status: Exclude<ApplicationStatus, 'Rejected'>)
     { label: 'Interview', reached: false },
     { label: 'Hired', reached: false },
   ]
+}
+
+// Periods offered on the admin Overview. Days start at midnight India time (IST = UTC+5:30, no daylight saving),
+// as decided in roadmap D25. "To" is left open: nothing can be created in the future.
+export type OverviewPreset = 'today' | '7d' | '30d' | 'all'
+export const OVERVIEW_PRESETS: ReadonlyArray<{ key: OverviewPreset; label: string }> = [
+  { key: 'today', label: 'Today' }, { key: '7d', label: 'Last 7 days' }, { key: '30d', label: 'Last 30 days' }, { key: 'all', label: 'All time' },
+]
+const IST_OFFSET_MS = 19_800_000
+const DAY_MS = 86_400_000
+const startOfIstDay = (ms: number): number => Math.floor((ms + IST_OFFSET_MS) / DAY_MS) * DAY_MS - IST_OFFSET_MS
+
+export function overviewRange(preset: OverviewPreset, now: number = Date.now()): OverviewRange {
+  if (preset === 'all') return { from: null, to: null }
+  const days = preset === 'today' ? 0 : preset === '7d' ? 6 : 29
+  return { from: new Date(startOfIstDay(now) - days * DAY_MS).toISOString(), to: null }
 }

@@ -6,7 +6,7 @@ import { Badge } from '../../shared/components/Badge'
 import { formatYears } from '../../shared/format'
 import { useResource } from '../../shared/hooks/useResource'
 
-export function CandidatesTable({ onChanged }: { onChanged: () => void }) {
+export function CandidatesTable() {
   const loader = useCallback(() => listCandidatesForAdmin(), [])
   const result = useResource(loader)
   const [type, setType] = useState<JobType | 'All'>('All')
@@ -19,7 +19,6 @@ export function CandidatesTable({ onChanged }: { onChanged: () => void }) {
     try {
       await setCandidateFlag(id, flag, value)
       result.reload()
-      onChanged()
     } catch {
       setError('Could not update. Please try again.')
     } finally {

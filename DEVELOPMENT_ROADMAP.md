@@ -154,12 +154,22 @@ main                  <- production; only tested, owner-approved releases; every
 - [ ] D9. Verification depth: ID photo only, or also police verification partner?
 - [ ] D10. Success-metric targets for first 90 days?
 - [ ] D11. Product name/domain final? ("Crew Connect" confirmed?)
-- [ ] D12. Starter designation names for Security and for Housekeeping (owner supplies them)
-- [ ] D13. Candidate picks one designation or several? (recommended: one)
-- [ ] D14. Who edits the admin lists: every admin or a super admin?
-- [ ] D15. Bangalore only, or build the city table now? (recommended: city table now, only Bangalore shown)
-- [ ] D16. Can users suggest a missing designation, or admin-only? (recommended: admin-only first)
-- [ ] D17. Keep Shift and Availability fixed in code (recommended) or admin lists?
+- [x] D12. Starter designation names for Security and for Housekeeping (owner supplies them) -> starter list, editable by the admin at any time. Security: Security guard, Lady security guard, Head guard, Security supervisor, Security officer, Armed guard (gunman), Bouncer, CCTV / control room operator. Housekeeping: Housekeeping staff, Office helper (office boy), Cleaner, Housekeeping supervisor, Washroom attendant, Room attendant, Pantry helper, Gardener. Chosen from common industry roles; NOT checked against any competitor app (their lists are not official documentation). DECIDED 2026-10-12 (delegated by the owner to Claude; the owner can change any of these)
+- [x] D13. Candidate picks one designation or several? (recommended: one) -> one designation per candidate. DECIDED 2026-10-12 (delegated by the owner to Claude; the owner can change any of these)
+- [x] D14. Who edits the admin lists: every admin or a super admin? -> every admin can edit the lists (all changes are audited). DECIDED 2026-10-12 (delegated by the owner to Claude; the owner can change any of these)
+- [x] D15. Bangalore only, or build the city table now? (recommended: city table now, only Bangalore shown) -> build the city table now, only Bangalore shown. DECIDED 2026-10-12 (delegated by the owner to Claude; the owner can change any of these)
+- [x] D16. Can users suggest a missing designation, or admin-only? (recommended: admin-only first) -> admin-only for now; revisit when real users report missing roles. DECIDED 2026-10-12 (delegated by the owner to Claude; the owner can change any of these)
+- [x] D17. Keep Shift and Availability fixed in code (recommended) or admin lists? -> Shift and Availability stay fixed in code. DECIDED 2026-10-12 (delegated by the owner to Claude; the owner can change any of these)
+- [x] D18. Visitors: unique visitors, page views, or both? Is a link to Cloudflare's own analytics acceptable if our dashboard cannot read it? (recommended: link first) -> show both unique visitors and page views; start with a link to Cloudflare's own analytics if our dashboard cannot read them (read API UNVERIFIED). DECIDED 2026-10-12 (delegated by the owner to Claude; the owner can change any of these)
+- [x] D19. Show "Revenue (demo credits)" before real payments, or hide revenue and net until Phase 3? (recommended: show, clearly labelled) -> show revenue labelled 'demo credits' until real payments exist. DECIDED 2026-10-12 (delegated by the owner to Claude; the owner can change any of these)
+- [x] D20. Admin MFA before real users, and how many admins / who? (recommended: yes) -> MFA required for admins before real users (method decided in that task from Supabase's official docs); owner plus at most 2 more admins, hard limit 5. DECIDED 2026-10-12 (delegated by the owner to Claude; the owner can change any of these)
+- [x] D21. ANSWERED 2026-10-12 (owner): the admin does NOT create candidates or employers (they self-register). The admin CAN add another admin and CAN hard delete a user or employer (safeguards in docs/ADMIN_DASHBOARD.md section 5)
+- [x] D22. May the admin change a user's phone number or role? (recommended: no in v1) -> no phone-number or role changes in version 1. DECIDED 2026-10-12 (delegated by the owner to Claude; the owner can change any of these)
+- [x] D23. What must an employer submit before approval (company name only today; GST, address, ID?) and must a rejection give a reason? -> company name required today; address and GST asked in roadmap 4.2; a rejection must give a reason shown to the employer. DECIDED 2026-10-12 (delegated by the owner to Claude; the owner can change any of these)
+- [x] D24. Cost per SMS (from your MSG91 rate card) and which other costs count (recommended: SMS and payment fees automatic, fixed costs entered by hand) -> SMS and payment fees counted automatically; other fixed costs entered by hand monthly; SMS rate to be entered by the owner from the MSG91 rate card (still needed from the owner). DECIDED 2026-10-12 (delegated by the owner to Claude; the owner can change any of these)
+- [x] D25. IST and Indian digit grouping for all dashboard numbers (recommended: yes) -> IST and Indian digit grouping everywhere. DECIDED 2026-10-12 (delegated by the owner to Claude; the owner can change any of these)
+- [x] D26. Hard delete: instant or 7-day "scheduled" delete (recommended 7 days)? Employers with wallet ledger rows: erase to an anonymous stub (recommended) or refuse? Audit row retention? Backup required before the first real delete? -> 7-day 'scheduled for deletion' that the admin can cancel; an employer with money records is erased to an anonymous stub (name and phone removed, id and ledger kept); audit rows kept 2 years; a backup must exist before the first real delete. DECIDED 2026-10-12 (delegated by the owner to Claude; the owner can change any of these)
+- [x] D27. Only the main admin (owner) deletes admins, any admin may add up to a limit (recommended), or every admin may do both? -> any admin may add admins up to the limit; only the main admin (owner) may delete admins. DECIDED 2026-10-12 (delegated by the owner to Claude; the owner can change any of these)
 
 ---
 
@@ -233,6 +243,8 @@ Why: today employers cannot post jobs, so the candidate side has nothing to appl
 - [ ] 4.5 Pagination + server-side filtering for candidates and jobs — candidates and unlocked lists are DONE in Phase 1 (keyset paging + Load more); jobs (capped at 100) and admin lists (capped at 500) remain
 - [ ] 4.6 Admin-controlled lists (job categories + designations, cities + areas, business numbers, reasons) instead of hard-coded lists in `config.ts` and CHECK constraints. DESIGN written 2026-10-12: [docs/ADMIN_CONTROLLED_LISTS.md](docs/ADMIN_CONTROLLED_LISTS.md); build order there (DB -> admin Lists tab -> candidate/job/search screens -> areas -> numbers/reasons -> cleanup). **Blocked on D12-D17**
 - [ ] 4.7 Job expiry and "filled" state
+- [ ] 4.8 (PART DONE 2026-10-12: Overview v1, step 1 of the build order; the rest is open) Admin dashboard v2 (design: [docs/ADMIN_DASHBOARD.md](docs/ADMIN_DASHBOARD.md), written 2026-10-12): Overview tiles with date range, Approvals queue, Users (add admin / edit / block / hard delete, all with audit log), Master data (= 4.6), Money tab. Build order is in the doc; the visitors tile waits for 2.6, the SMS cost tile for 1.8 plus an SMS counter, revenue and net for Phase 3. Decisions D12-D27 made 2026-10-12 (delegated). Still needed from the owner: SMS rate (D24)
+- [ ] 4.9 Audit table for admin actions (shared with 4.6 and 5.6)
 **Exit check:** full loop works with real accounts: post job → candidate applies → employer shortlists → candidate sees it.
 
 ### Phase 5 – Trust & verification  *(branch: `phase/5-trust-verification`)*
@@ -306,3 +318,6 @@ Why: product is only proven by real usage.
 | 2026-10-12 | Release v0.1.0 (first release: develop -> main via PR #9; tag on `4464f5f`; the release template was NOT used for this first one) | `develop` into `main` | 4464f5f | Cloudflare: redeploy previous deployment; git: `git revert -m 1 4464f5f` on a `hotfix/*` branch |
 | 2026-10-12 | Design for admin-controlled lists (4.6), decisions D12-D17 opened | `docs/admin-controlled-lists` into `develop` | see git log | `git revert -m 1 <merge>` |
 | 2026-10-12 | Improved My applications screen (4.4 part) | `feat/applications-view` into `develop` | see git log | `git revert -m 1 <merge>` |
+| 2026-10-12 | Design for admin dashboard v2 (4.8), decisions D18-D25 opened | `docs/admin-dashboard-plan` into `develop` | see git log | `git revert -m 1 <merge>` |
+| 2026-10-12 | Admin decisions D12-D27 recorded (delegated by the owner) | `docs/admin-decisions` into `develop` | see git log | `git revert -m 1 <merge>` |
+| 2026-10-12 | Admin Overview v1 (4.8 step 1): admin_overview() + Overview tab with period chips | `feat/admin-overview` into `develop` | see git log | `git revert -m 1 <merge>`; database: `supabase/rollback/20261012120000_admin_overview.down.sql` |

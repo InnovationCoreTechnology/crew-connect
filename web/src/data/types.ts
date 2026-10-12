@@ -75,14 +75,18 @@ export interface CandidateFilters {
   query: string
 }
 
-export interface AdminStats {
-  candidates: number
-  employers: number
-  pendingEmployers: number
-  jobs: number
-  unlocks: number
-  revenueInr: number
+// Admin Overview numbers (server function admin_overview). Totals are all-time; the `new*` numbers count rows created in the
+// chosen period. Revenue is internal demo credits (unlock charges) until real payments exist (roadmap Phase 3).
+export interface AdminOverview {
+  candidates: { total: number; withCompleteProfile: number; new: number }
+  employers: { total: number; approved: number; pending: number; blocked: number; new: number }
+  jobs: { total: number; new: number }
+  applications: { total: number; new: number }
+  unlocks: { total: number; new: number }
+  revenueInr: { total: number; period: number }
 }
+// Period for the Overview: ISO times, null = no bound ("from" included, "to" excluded).
+export interface OverviewRange { from: string | null; to: string | null }
 
 // Paging. The server returns the newest rows first; `next` is where the following page starts
 // (null = this was the last page). Keyset ("cursor") paging keeps every page equally fast, however deep.

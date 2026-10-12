@@ -4,8 +4,8 @@ import type { JobType } from '../app/config'
 import type { Database } from '../lib/database.types'
 import { supabase } from '../lib/supabase'
 import type {
-  AdminCandidate, AdminEmployer, AdminList, AdminStats, ApplicationStatus, ApplicationView, CandidateCardData,
-  CandidateFilters, CandidateProfile, Cursor, EmployerAccount, EmployerStatus, JobWithCompany, Page, UnlockResult,
+  AdminCandidate, AdminEmployer, AdminList, AdminOverview, ApplicationStatus, ApplicationView, CandidateCardData,
+  CandidateFilters, CandidateProfile, Cursor, EmployerAccount, EmployerStatus, JobWithCompany, OverviewRange, Page, UnlockResult,
 } from './types'
 
 // THE data layer. Screens call ONLY these functions and never touch Supabase directly.
@@ -190,14 +190,18 @@ function toAdminList<R, T>(rows: R[], map: (r: R) => T): AdminList<T> {
   return { items: rows.slice(0, ADMIN_LIST_LIMIT).map(map), truncated: rows.length > ADMIN_LIST_LIMIT }
 }
 
-export async function getAdminStats(): Promise<AdminStats> {
-  const { data, error } = await supabase.rpc('admin_stats')
+export async function getAdminOverview(range: OverviewRange): Promise<AdminOverview> {
+  const { data, error } = await supabase.rpc('admin_overview', { p_from: range.from ?? undefined, p_to: range.to ?? undefined })
   if (error) fail(error)
-  const s = data[0]
-  if (!s) throw new ApiError('UNKNOWN', MESSAGES.UNKNOWN)
+  const o = data[0]
+  if (!o) throw new ApiError('UNKNOWN', MESSAGES.UNKNOWN)
   return {
-    candidates: s.candidates_count, employers: s.employers_count, pendingEmployers: s.pending_employers_count,
-    jobs: s.jobs_count, unlocks: s.unlocks_count, revenueInr: s.revenue_inr,
+    candidates: { total: o.candidates_total, withCompleteProfile: o.candidates_visible, new: o.candidates_new },
+    employers: { total: o.employers_total, approved: o.employers_approved, pending: o.employers_pending, blocked: o.employers_blocked, new: o.employers_new },
+    jobs: { total: o.jobs_total, new: o.jobs_new },
+    applications: { total: o.applications_total, new: o.applications_new },
+    unlocks: { total: o.unlocks_total, new: o.unlocks_new },
+    revenueInr: { total: o.revenue_total_inr, period: o.revenue_range_inr },
   }
 }
 

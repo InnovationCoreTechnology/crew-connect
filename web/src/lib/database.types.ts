@@ -1,5 +1,5 @@
 // GENERATED from the live database schema (Supabase MCP generate_typescript_types, project qehkkituvqaishysoqta,
-// 2026-10-11). Do NOT edit by hand. Regenerate after every migration (see supabase/README.md) so the compiler
+// 2026-10-11, admin_overview added 2026-10-12 from a fresh generation). Do NOT edit by hand. Regenerate after every migration (see supabase/README.md) so the compiler
 // catches any mismatch between the database and web/src/data/api.ts.
 // Trimmed: the generic helper types (Tables, Enums, ...) were removed because nothing uses them.
 //
@@ -262,6 +262,27 @@ export type Database = {
           phone: string
           spent_inr: number
           status: string
+        }[]
+      }
+      admin_overview: {
+        Args: { p_from?: string; p_to?: string }
+        Returns: {
+          applications_new: number
+          applications_total: number
+          candidates_new: number
+          candidates_total: number
+          candidates_visible: number
+          employers_approved: number
+          employers_blocked: number
+          employers_new: number
+          employers_pending: number
+          employers_total: number
+          jobs_new: number
+          jobs_total: number
+          revenue_range_inr: number
+          revenue_total_inr: number
+          unlocks_new: number
+          unlocks_total: number
         }[]
       }
       admin_set_candidate_flag: {
