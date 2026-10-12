@@ -11,7 +11,8 @@
 -- a bcrypt hash (extensions.crypt). This is not an officially documented way (the supported one is the Auth Admin API), but
 -- VERIFIED 2026-10-11: Supabase Auth accepts these rows and password login works.
 -- It also lists 10 DEV test numbers (9000000001-10) that get the fixed OTP 123456 and send no SMS, so Register and
--- Forgot password can be tried before an SMS gateway exists. NEVER add rows to private.test_phones in production.
+-- Forgot password can be tried before an SMS gateway exists. This script also sets app_settings.dev_mode = 1 (it defaults to 0:
+-- with 0 the test numbers are ignored). NEVER run this seed on production and never set dev_mode = 1 there.
 --
 -- Accounts (mobile -> role): 9845000001 candidate (full profile, 1 application) · 9845000003 candidate (EMPTY profile)
 --   9845000002 employer (Approved, 3 free unlocks) · 9900000002 employer (Pending) · 9845000000 admin
@@ -34,6 +35,8 @@ begin
 
   -- dev test numbers: fixed OTP 123456, no SMS (see header)
   insert into private.test_phones (phone) select '90000000' || lpad(i::text, 2, '0') from generate_series(1, 10) i on conflict do nothing;
+  -- Test numbers only work while app_settings.dev_mode = 1. This switch is what protects production if this seed is ever run there by mistake.
+  insert into public.app_settings (key, value) values ('dev_mode', 1) on conflict (key) do update set value = 1;
 
   create temp table seed_accounts (phone text primary key, role text not null, pw text not null, id uuid not null default gen_random_uuid()) on commit drop;
   create temp table seed_cand (phone text, name text, type text, exp int, area text, salary int, shift text, avail text, verified boolean) on commit drop;

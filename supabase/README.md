@@ -34,6 +34,10 @@ they are the API, and each one checks the caller's role itself (proved by `tests
 - Concurrency of two simultaneous unlocks is protected by `SELECT … FOR UPDATE` on the employer row and the primary key on
   `unlocks`, but a true parallel test is not automated yet (the SQL test runs in one session).
 
+## Safety switches (app_settings)
+- `dev_mode` (default **0**): only when 1 do the dev test numbers in `private.test_phones` work (fixed OTP 123456, no SMS). The dev seed sets it to 1. **Never set it to 1 on production.**
+- `otp_*`: cooldown, hourly caps (per number, per caller IP, whole project), wrong-guess limit, expiry, and `otp_retention_days` (old OTP rows are deleted automatically whenever a new OTP is requested).
+
 ## Tests
 - `tests/rules.test.sql` - database rules (run in the SQL editor / MCP; ends with "ALL TESTS PASSED (rolled back)").
 - `tests/turnstile.test.mjs` - the CAPTCHA verification module against Cloudflare's real Siteverify with its dummy keys: `node supabase/tests/turnstile.test.mjs` (Node 22.18+, needs internet, no account).

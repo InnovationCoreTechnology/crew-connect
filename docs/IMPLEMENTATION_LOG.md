@@ -120,3 +120,25 @@ Append-only history of what was built, why, and how to undo it. Newest entry at 
 - Rollback: `git revert -m 1 <merge>`; redeploy the previous Edge Function version (the temporary and final builds differ from before only by the CAPTCHA lines).
 - Notes: two registrations with test numbers 9000000009 (candidate) and 9000000010 (employer) appeared in the database on 2026-10-12 02:30-02:32 UTC (not made by this session); left untouched. The test numbers 9000000001-8 had throwaway OTP rows from testing; deleted.
 - Follow-ups / needs owner: create the Turnstile widget in Cloudflare (free), set the site key (`VITE_TURNSTILE_SITE_KEY`, also as a Cloudflare build variable if building there) and the secret (`TURNSTILE_SECRET_KEY` in Supabase Edge Function secrets); restrict the widget to your hostnames; then I re-test the real-key path.
+
+### 2026-10-12 · PR #6 review fixes (8 findings) · own OTP system hardening
+- Branch / commit: `fix/pr6-review` (merged into `phase/1b-password-login`, PR #6).
+- What changed (finding numbers from the review):
+  1. **Stuck after a failed registration:** `register` now finishes a login that has no account (new `auth_find_orphan_login`, then set password + create the account) instead of answering ALREADY_REGISTERED; the result of the cleanup `deleteUser` is now checked and logged.
+  2. **Number probing:** the OTP rate limits now run BEFORE the registered / not-registered answers, and a new per-IP limit (`auth_ip_allow`, 20 per hour, IP stored only as a sha-256 hash, deleted after a day) is applied by the Edge Function. Not covered: a determined attacker with many IPs; the CAPTCHA and the project-wide cap remain the other layers.
+  3. **Test numbers in production:** they only work when `app_settings.dev_mode = 1` (default 0). The dev seed sets it; this dev project has it on.
+  4. **Retention:** OTP rows older than `otp_retention_days` (7) and IP hits older than a day are deleted whenever an OTP is requested (pg_cron not used: its setup SQL is not on Supabase's cron page, so I could not verify it).
+  5. **Consume result:** the Edge Function now checks and logs a failed "mark code as used" in register and reset.
+  6. **Simultaneous requests:** `pg_advisory_xact_lock(hashtext(phone))` at the start of `auth_otp_issue`.
+  7. **72 bytes:** both the Edge Function and the web validator count BYTES (`TextEncoder`), with a clearer message.
+  8. **Sessions after reset:** new server-only `auth_revoke_sessions`, called after `updateUserById`.
+- Files: `supabase/migrations/20261012100000_otp_review_fixes.sql` (+ rollback), `supabase/functions/account-auth/index.ts`, `supabase/tests/rules.test.sql`, `supabase/seed/dev_seed.sql`, `web/src/features/auth/validators.ts`, docs.
+- Sources: the PR #6 review; Supabase cron page (no setup SQL, so not used); Auth behaviour verified by tests below.
+- Verification: `supabase/tests/rules.test.sql` -> ALL TESTS PASSED (rolled back) with new cases for findings 2, 3, 4, 1 (helper), 8 and "browsers cannot call the new functions"; seeded data confirmed intact afterwards. Reversal script run in a rolled-back transaction (0 new objects left, restored function works). Deployed Edge Function version 4 (exact repo source). Live tests: per-IP limit (3rd request from one caller refused; stored IPs are all 64-hex sha-256); orphan login finished and then usable (old password rejected); a 37-character Hindi password (109 bytes) refused; old device's refresh token refused after a reset (`refresh_token_not_found`) and the new password works. `npm run lint`, tsc clean.
+- NOT verified: the advisory lock under real simultaneous requests (smoke-tested only); which header Supabase's edge guarantees for the caller IP (the code uses `cf-connecting-ip`, then the first `x-forwarded-for` value; the live test shows an IP was available, not which header); access tokens issued before a reset stay valid until they expire (default 1 hour).
+- Performance impact: each OTP request does one extra small insert (IP log) and one range delete; negligible at this scale.
+- Cost impact: none.
+- Dependencies changed: none.
+- Rollback: `git revert -m 1 <merge>`; database `supabase/rollback/20261012100000_otp_review_fixes.down.sql` (brings back the findings); Edge Function: redeploy version 3 (CAPTCHA build without these fixes).
+- Test data touched: temporary test accounts 9000000012 / 9000000013 created for the live tests and deleted; two accounts 9000000009 / 9000000010 that someone else registered earlier were left untouched.
+- Follow-ups: the review's suggestion to track items 2, 4 and 8 separately is no longer needed (done here); still open: real Turnstile keys, MSG91 gateway, MFA for recycled numbers.
